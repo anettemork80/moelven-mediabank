@@ -522,14 +522,14 @@ async function downloadSelected(){
 
 function openModal(){
   mCats=new Set();mProds=new Set();mProdColors=new Map();mExtras=new Set();mProfile=null;
-  document.getElementById('imgTitle').value='';document.getElementById('filePrev').textContent='';document.getElementById('imgCredit').value='';document.getElementById('customColor').value='';
+  document.getElementById('imgTitle').value='';document.getElementById('filePrev').textContent='';document.getElementById('imgCredit').value='';
   document.getElementById('imgPreviewWrap').innerHTML='';document.getElementById('imgPreviewWrap').classList.remove('show');
   document.querySelectorAll('.e-chip').forEach(e=>e.classList.remove('selected'));
   document.getElementById('progressBar').style.display='none';
   document.getElementById('progressFill').style.width='0%';
   pendingFiles=[];
   document.getElementById('catCbs').innerHTML=Object.keys(TAXONOMY).map(cat=>`<div class="cat-cb" id="cb_${cat.replace(/\s+/g,'_')}" onclick="toggleCat('${cat}')"><div class="cat-cb-box"><div class="cat-cb-check"></div></div>${cat}</div>`).join('');
-  renderProdAcc();renderColorChips();renderProfileChips();document.getElementById('modal').classList.add('open');
+  renderProdAcc();renderProfileChips();document.getElementById('modal').classList.add('open');
 }
 function closeModal(){document.getElementById('modal').classList.remove('open');}
 function toggleCat(cat){const lb=document.getElementById('cb_'+cat.replace(/\s+/g,'_'));if(mCats.has(cat)){mCats.delete(cat);lb.classList.remove('checked');for(const p of Object.keys(TAXONOMY[cat].products)){mProds.delete(p);mProdColors.delete(p);}}else{mCats.add(cat);lb.classList.add('checked');}renderProdAcc();renderProfileChips();}
