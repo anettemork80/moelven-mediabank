@@ -120,13 +120,16 @@
   .modal-sub { font-size:12.5px; color:var(--text-light); margin-bottom:22px; line-height:1.55; padding-left:13px; }
   .form-group { margin-bottom:18px; }
   .form-label { display:block; font-size:10.5px; font-weight:600; color:var(--text-light); margin-bottom:7px; text-transform:uppercase; letter-spacing:0.7px; }
-  .form-label em { font-weight:400; text-transform:none; letter-spacing:0; color:#c0b8b2; font-style:normal; margin-left:5px; }
+  .form-label em { font-weight:400; text-transform:none; letter-spacing:0; color:#8a7e78; font-style:normal; margin-left:5px; }
   .form-input { width:100%; padding:9px 12px; border:1.5px solid var(--border); border-radius:5px; font-family:'Source Sans 3',sans-serif; font-size:13.5px; outline:none; transition:border-color 0.15s; color:var(--text); }
   .form-input:focus { border-color:var(--teal); }
   .drop-zone { border:2px dashed var(--border); border-radius:7px; padding:24px; text-align:center; cursor:pointer; transition:all 0.15s; background:var(--bg-cream); }
   .drop-zone:hover { border-color:var(--teal); background:var(--bg-green); }
   .drop-zone p { color:var(--text-light); font-size:13px; }
   .drop-zone strong { color:var(--teal); }
+  .img-preview-wrap { display:none; margin-top:10px; display:none; gap:6px; flex-wrap:wrap; }
+  .img-preview-wrap.show { display:flex; }
+  .img-preview-thumb { width:72px; height:72px; object-fit:cover; border-radius:5px; border:1.5px solid var(--border); }
   .file-prev { margin-top:6px; color:var(--teal-light); font-size:12.5px; font-weight:500; }
   .progress-bar { width:100%; height:4px; background:var(--border); border-radius:2px; margin-top:10px; display:none; }
   .progress-fill { height:100%; background:var(--teal); border-radius:2px; transition:width 0.3s; }
@@ -223,6 +226,7 @@
         <div class="file-prev" id="filePrev"></div>
       </div>
       <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)">
+      <div class="img-preview-wrap" id="imgPreviewWrap"></div>
       <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
     </div>
     <div class="form-group">
@@ -443,6 +447,7 @@ async function downloadSelected(){
 function openModal(){
   mCats=new Set();mProds=new Set();mColors=new Set();mExtras=new Set();
   document.getElementById('imgTitle').value='';document.getElementById('filePrev').textContent='';document.getElementById('imgCredit').value='';
+  document.getElementById('imgPreviewWrap').innerHTML='';document.getElementById('imgPreviewWrap').classList.remove('show');
   document.querySelectorAll('.e-chip').forEach(e=>e.classList.remove('selected'));
   document.getElementById('progressBar').style.display='none';
   document.getElementById('progressFill').style.width='0%';
@@ -457,7 +462,18 @@ function toggleProd(p){mProds.has(p)?mProds.delete(p):mProds.add(p);renderProdAc
 function renderColorChips(){const wrap=document.getElementById('colorWrap'),all=new Set();for(const cat of mCats)for(const p of mProds){const cs=TAXONOMY[cat]?.products[p];if(cs)cs.forEach(c=>all.add(c));}if(!all.size){wrap.style.display='none';return;}wrap.style.display='block';document.getElementById('colorChips').innerHTML=[...all].map(c=>`<div class="c-chip ${mColors.has(c)?'selected':''}" onclick="toggleColor('${c}')">${c}</div>`).join('');}
 function toggleColor(c){mColors.has(c)?mColors.delete(c):mColors.add(c);renderColorChips();}
 function toggleExtra(el,t){mExtras.has(t)?(mExtras.delete(t),el.classList.remove('selected')):(mExtras.add(t),el.classList.add('selected'));}
-function handleFiles(files){pendingFiles=Array.from(files);document.getElementById('filePrev').textContent=pendingFiles.length===1?pendingFiles[0].name:`${pendingFiles.length} filer valgt`;}
+function handleFiles(files){
+  pendingFiles=Array.from(files);
+  document.getElementById('filePrev').textContent=pendingFiles.length===1?pendingFiles[0].name:`${pendingFiles.length} filer valgt`;
+  const wrap=document.getElementById('imgPreviewWrap');
+  wrap.innerHTML='';
+  pendingFiles.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{const img=document.createElement('img');img.src=e.target.result;img.className='img-preview-thumb';img.title=file.name;wrap.appendChild(img);};
+    reader.readAsDataURL(file);
+  });
+  wrap.classList.add('show');
+}
 
 async function saveImage(){
   if(!mCats.size){showToast('Velg minst én kategori');return;}
