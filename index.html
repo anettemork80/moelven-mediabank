@@ -593,8 +593,8 @@ async function saveImage(){
     const ext=file.name.match(/\.[^.]+$/)?.[0]||'';
     const slugParts=['Moelven',...prodColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))];
     const autoSlug=slugParts.join('-');
-    const titleParts=['Moelven',...prodColorPairs.map(({prod,color})=>prod+(color?'-'+color:''))];
-    const autoTitle=titleParts.join('-');
+    const titleParts=['Moelven',...prodColorPairs.map(({prod,color})=>prod+(color?' '+color:''))];
+    const autoTitle=titleParts.join(' ');
     const usedTitle=meta.title||autoTitle;
     const autoFileName=autoSlug+ext;
     const fm={...meta,title:usedTitle};
@@ -667,7 +667,7 @@ async function saveEdit(){
   const typedTitle=document.getElementById('editTitle').value.trim();
   const eProdColorPairs=[...eProds].map(p=>({prod:p,color:eProdColors.get(p)||null}));
   const eColors=[...new Set(eProdColorPairs.map(({color})=>color).filter(Boolean))];
-  const autoTitle=['Moelven',...eProdColorPairs.map(({prod,color})=>prod+(color?'-'+color:''))].join('-');
+  const autoTitle=['Moelven',...eProdColorPairs.map(({prod,color})=>prod+(color?' '+color:''))].join(' ');
   const newTitle=typedTitle||autoTitle;
   const meta={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile};
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
