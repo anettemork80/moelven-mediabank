@@ -369,7 +369,7 @@ const PROFILES={
 let tokenClient;
 
 const TAXONOMY={
-  "Kledning":{products:{"Heftig BAS":[],"Heftig PRO":["Egghvit","Fritt fargevalg"],"Heftig PRO+":["Egghvit","Fritt fargevalg"],"Heftig SYN":["Fritt fargevalg"],"Heftig EKO":["Egghvit","Fritt fargevalg"],"Værbitt":["Gråna","Herja","Fura","Garva","Barka"],"Cu-impregnert kledning":[],"Ubehandlet gran kledning":[],"Vestlandskledning":[],"Barokk kledning":[],"Sveitserkledning":[],"Tiurkledning":[]}},
+  "Kledning":{products:{"Heftig BAS":[],"Heftig PRO":["Egghvit","Fritt fargevalg"],"Heftig PRO+":["Egghvit","Fritt fargevalg"],"Heftig SYN":["Fritt fargevalg"],"Heftig EKO":["Egghvit","Fritt fargevalg"],"Værbitt":["Gråna","Herja","Fura","Garva","Barka"],"Cu-impregnert kledning":[],"Ubehandlet gran kledning":[]}},
   "Terrasse og uterom":{products:{"Terrassebord Cu-impregnert":[],"Terrassebord Royal":["Brun","Grå"],"Terrassebord Termotre ask":[],"Terrassebord Termotre furu":[],"Altanrekker Cu":[],"Altanrekker Royal":["Brun","Grå"],"Spiler Cu-impregnert":[],"Spiler Royal":["Brun","Grå"],"Stolper og søyler":[],"Takrenne":[],"Rekkverk":[],"Vannbrett":[]}},
   "Gulv":{products:{"Heltregulv furu":["Ubehandlet","Arctic","Kongle","Andes","Etna","Nordic","Hellegrå"],"Heltregulv furu børstet":["Arctic","Kongle","Etna","Nordic"],"Heltregulv gran":["Ubehandlet","Arctic"],"Heltregulv eik":["Nordic","Kongle","Arctic"],"Herregårdsgulv eik":["Arctic","Kongle"],"Parkett eik":["Arctic","Kongle","Grafitt","Snø"],"Klassisk håndtverksgulv":["Ubehandlet","Kongle","Arctic"]}},
   "Trepanel":{products:{"Sprekkpanel ubehandlet":[],"Sprekkpanel beiset":["Skigardsgrå","Morgendis","Himmelgrå","Sandbeige","Seterbrun","Fjellbrun","Skogbrun","Drivved","Svaberg"],"Sprekkpanel hvitlasert":[],"Sprekkpanel malt":["Bomull"],"Sprekkpanel oljet":["Arctic","Kongle","Fjell","Grafitt"],"Glattpanel":["Ubehandlet","Hvitlasert","Beiset Drivved"],"Faspanel":["Ubehandlet","Hvitlasert","Malt Bomull"],"Skyggepanel":["Ubehandlet","Hvitlasert"],"Herregårdspanel":["Arctic","Kongle","Fjell","Grafitt"],"Sjøbodpanel":["Sten","Snø","Lava","Kakao"],"Perlestaff panel":[],"Krokskogpanel":[],"Østerdalspanel":[],"Spiler innvendig":[]}},
@@ -587,8 +587,11 @@ async function saveImage(){
   let done=0;
   for(const file of pendingFiles){
     const ext=file.name.match(/\.[^.]+$/)?.[0]||'';
-    const autoSlug=['Moelven',...meta.products,...effectiveColors].filter(Boolean).map(s=>s.replace(/\s+/g,'')).join('-');
-    const autoTitle=['Moelven',...meta.products,...effectiveColors].filter(Boolean).join(' ');
+    const colorPart=effectiveColors.filter(Boolean).map(c=>c.replace(/\s+/g,'')).join('-');
+    const slugParts=['Moelven',...meta.products.map(p=>p.replace(/\s+/g,'')+(colorPart?'-'+colorPart:''))];
+    const autoSlug=slugParts.filter(Boolean).join('-');
+    const titleParts=['Moelven',...meta.products.map(p=>p+(effectiveColors.length?'-'+effectiveColors.join('-'):''))];
+    const autoTitle=titleParts.filter(Boolean).join('-');
     const usedTitle=meta.title||autoTitle;
     const autoFileName=autoSlug+ext;
     const fm={...meta,title:usedTitle};
@@ -650,11 +653,13 @@ async function saveEdit(){
   const editCustomColor=document.getElementById('editCustomColor').value.trim();
   const editEffectiveColors=[...eColors].map(c=>c==='Fritt fargevalg'&&editCustomColor?editCustomColor:c);
   const typedTitle=document.getElementById('editTitle').value.trim();
-  const autoTitle=['Moelven',...eProds,...editEffectiveColors].filter(Boolean).join(' ');
+  const editColorPart=editEffectiveColors.filter(Boolean).join('-');
+  const autoTitle=['Moelven',...[...eProds].map(p=>p+(editColorPart?'-'+editColorPart:''))].filter(Boolean).join('-');
   const newTitle=typedTitle||autoTitle;
   const meta={title:newTitle,categories:[...eCats],products:[...eProds],colors:editEffectiveColors,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),customColor:editCustomColor,profile:eProfile};
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
-  const newFileName=['Moelven',...meta.products,...editEffectiveColors].filter(Boolean).map(s=>s.replace(/\s+/g,'')).join('-')+ext;
+  const editColorSlug=editEffectiveColors.filter(Boolean).map(c=>c.replace(/\s+/g,'')).join('-');
+  const newFileName=['Moelven',...meta.products.map(p=>p.replace(/\s+/g,'')+(editColorSlug?'-'+editColorSlug:''))].filter(Boolean).join('-')+ext;
   try{
     await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
