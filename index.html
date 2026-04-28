@@ -248,6 +248,9 @@
     <div class="form-group" id="colorWrap" style="display:none">
       <label class="form-label">Farger / Varianter</label>
       <div class="color-chips" id="colorChips"></div>
+      <div id="customColorWrap" style="display:none;margin-top:10px;">
+        <input type="text" class="form-input" id="customColor" placeholder="Skriv inn fargekode, f.eks. Jotun 1234 eller RAL 7016" style="margin-top:4px;">
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label">Type bilde</label>
@@ -297,6 +300,9 @@
     <div class="form-group" id="editColorWrap" style="display:none">
       <label class="form-label">Farger / Varianter</label>
       <div class="color-chips" id="editColorChips"></div>
+      <div id="editCustomColorWrap" style="display:none;margin-top:10px;">
+        <input type="text" class="form-input" id="editCustomColor" placeholder="Skriv inn fargekode, f.eks. Jotun 1234 eller RAL 7016" style="margin-top:4px;">
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label">Type bilde</label>
@@ -341,7 +347,7 @@ let mCats=new Set(), mProds=new Set(), mColors=new Set(), mExtras=new Set();
 let tokenClient;
 
 const TAXONOMY={
-  "Kledning":{products:{"Heftig BAS":[],"Heftig PRO":["Egghvit","Fritt fargevalg"],"Heftig PRO+":["Egghvit","Stockholmsgrønn","Fritt fargevalg"],"Heftig SYN":["Fritt fargevalg"],"Heftig EKO":["Egghvit","Fritt fargevalg"],"Værbitt":["Gråna","Herja","Fura","Garva","Barka"],"Cu-impregnert kledning":[],"Ubehandlet gran kledning":[],"Vestlandskledning":[],"Barokk kledning":[],"Sveitserkledning":[],"Tiurkledning":[]}},
+  "Kledning":{products:{"Heftig BAS":[],"Heftig PRO":["Egghvit","Fritt fargevalg"],"Heftig PRO+":["Egghvit","Fritt fargevalg"],"Heftig SYN":["Fritt fargevalg"],"Heftig EKO":["Egghvit","Fritt fargevalg"],"Værbitt":["Gråna","Herja","Fura","Garva","Barka"],"Cu-impregnert kledning":[],"Ubehandlet gran kledning":[],"Vestlandskledning":[],"Barokk kledning":[],"Sveitserkledning":[],"Tiurkledning":[]}},
   "Terrasse og uterom":{products:{"Terrassebord Cu-impregnert":[],"Terrassebord Royal":["Brun","Grå"],"Terrassebord Termotre ask":[],"Terrassebord Termotre furu":[],"Altanrekker Cu":[],"Altanrekker Royal":["Brun","Grå"],"Spiler Cu-impregnert":[],"Spiler Royal":["Brun","Grå"],"Stolper og søyler":[],"Takrenne":[],"Rekkverk":[],"Vannbrett":[]}},
   "Gulv":{products:{"Heltregulv furu":["Ubehandlet","Arctic","Kongle","Andes","Etna","Nordic","Hellegrå"],"Heltregulv furu børstet":["Arctic","Kongle","Etna","Nordic"],"Heltregulv gran":["Ubehandlet","Arctic"],"Heltregulv eik":["Nordic","Kongle","Arctic"],"Herregårdsgulv eik":["Arctic","Kongle"],"Parkett eik":["Arctic","Kongle","Grafitt","Snø"],"Klassisk håndtverksgulv":["Ubehandlet","Kongle","Arctic"]}},
   "Trepanel":{products:{"Sprekkpanel ubehandlet":[],"Sprekkpanel beiset":["Skigardsgrå","Morgendis","Himmelgrå","Sandbeige","Seterbrun","Fjellbrun","Skogbrun","Drivved","Svaberg"],"Sprekkpanel hvitlasert":[],"Sprekkpanel malt":["Bomull"],"Sprekkpanel oljet":["Arctic","Kongle","Fjell","Grafitt"],"Glattpanel":["Ubehandlet","Hvitlasert","Beiset Drivved"],"Faspanel":["Ubehandlet","Hvitlasert","Malt Bomull"],"Skyggepanel":["Ubehandlet","Hvitlasert"],"Herregårdspanel":["Arctic","Kongle","Fjell","Grafitt"],"Sjøbodpanel":["Sten","Snø","Lava","Kakao"],"Perlestaff panel":[],"Krokskogpanel":[],"Østerdalspanel":[],"Spiler innvendig":[]}},
@@ -486,7 +492,7 @@ async function downloadSelected(){
 
 function openModal(){
   mCats=new Set();mProds=new Set();mColors=new Set();mExtras=new Set();
-  document.getElementById('imgTitle').value='';document.getElementById('filePrev').textContent='';document.getElementById('imgCredit').value='';
+  document.getElementById('imgTitle').value='';document.getElementById('filePrev').textContent='';document.getElementById('imgCredit').value='';document.getElementById('customColor').value='';
   document.getElementById('imgPreviewWrap').innerHTML='';document.getElementById('imgPreviewWrap').classList.remove('show');
   document.querySelectorAll('.e-chip').forEach(e=>e.classList.remove('selected'));
   document.getElementById('progressBar').style.display='none';
@@ -499,7 +505,7 @@ function closeModal(){document.getElementById('modal').classList.remove('open');
 function toggleCat(cat){const lb=document.getElementById('cb_'+cat.replace(/\s+/g,'_'));if(mCats.has(cat)){mCats.delete(cat);lb.classList.remove('checked');for(const p of Object.keys(TAXONOMY[cat].products))mProds.delete(p);}else{mCats.add(cat);lb.classList.add('checked');}renderProdAcc();renderColorChips();}
 function renderProdAcc(){const acc=document.getElementById('prodAcc');if(!mCats.size){acc.innerHTML='<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div>';return;}acc.innerHTML=[...mCats].map(cat=>`<div class="prod-cat-hd">${cat}</div><div class="prod-items">${Object.keys(TAXONOMY[cat].products).map(p=>`<div class="prod-chip ${mProds.has(p)?'selected':''}" onclick="toggleProd('${p}')">${p}</div>`).join('')}</div>`).join('');}
 function toggleProd(p){mProds.has(p)?mProds.delete(p):mProds.add(p);renderProdAcc();renderColorChips();}
-function renderColorChips(){const wrap=document.getElementById('colorWrap'),all=new Set();for(const cat of mCats)for(const p of mProds){const cs=TAXONOMY[cat]?.products[p];if(cs)cs.forEach(c=>all.add(c));}if(!all.size){wrap.style.display='none';return;}wrap.style.display='block';document.getElementById('colorChips').innerHTML=[...all].map(c=>`<div class="c-chip ${mColors.has(c)?'selected':''}" onclick="toggleColor('${c}')">${c}</div>`).join('');}
+function renderColorChips(){const wrap=document.getElementById('colorWrap'),all=new Set();for(const cat of mCats)for(const p of mProds){const cs=TAXONOMY[cat]?.products[p];if(cs)cs.forEach(c=>all.add(c));}if(!all.size){wrap.style.display='none';return;}wrap.style.display='block';document.getElementById('colorChips').innerHTML=[...all].map(c=>`<div class="c-chip ${mColors.has(c)?'selected':''}" onclick="toggleColor('${c}')">${c}</div>`).join('');document.getElementById('customColorWrap').style.display=mColors.has('Fritt fargevalg')?'block':'none';}
 function toggleColor(c){mColors.has(c)?mColors.delete(c):mColors.add(c);renderColorChips();}
 function toggleExtra(el,t){mExtras.has(t)?(mExtras.delete(t),el.classList.remove('selected')):(mExtras.add(t),el.classList.add('selected'));}
 function handleFiles(files){
@@ -522,12 +528,14 @@ async function saveImage(){
   saveBtn.disabled=true;cancelBtn.disabled=true;saveBtn.textContent='Laster opp…';
   document.getElementById('progressBar').style.display='block';
   const credit=document.getElementById('imgCredit').value.trim();
-  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors:[...mColors],extras:[...mExtras],credit};
+  const customColor=document.getElementById('customColor').value.trim();
+  const effectiveColors=[...mColors].map(c=>c==='Fritt fargevalg'&&customColor?customColor:c);
+  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors:effectiveColors,extras:[...mExtras],credit,customColor};
   let done=0;
   for(const file of pendingFiles){
     const ext=file.name.match(/\.[^.]+$/)?.[0]||'';
-    const autoSlug=['Moelven',...meta.products,...meta.colors].filter(Boolean).map(s=>s.replace(/\s+/g,'')).join('-');
-    const autoTitle=['Moelven',...meta.products,...meta.colors].filter(Boolean).join(' ');
+    const autoSlug=['Moelven',...meta.products,...effectiveColors].filter(Boolean).map(s=>s.replace(/\s+/g,'')).join('-');
+    const autoTitle=['Moelven',...meta.products,...effectiveColors].filter(Boolean).join(' ');
     const usedTitle=meta.title||autoTitle;
     const autoFileName=autoSlug+ext;
     const fm={...meta,title:usedTitle};
@@ -551,6 +559,7 @@ function openEditModal(id){
   eExtras=new Set(img.extras||[]);
   document.getElementById('editTitle').value=img.title||'';
   document.getElementById('editCredit').value=img.credit||'';
+  document.getElementById('editCustomColor').value=img.customColor||'';
   if(img.thumbnailLink){
     document.getElementById('editThumb').src=img.thumbnailLink.replace('=s220','=s800');
     document.getElementById('editThumbWrap').style.display='block';
@@ -565,7 +574,7 @@ function closeEditModal(){document.getElementById('editModal').classList.remove(
 function eToggleCat(cat){const lb=document.getElementById('ecb_'+cat.replace(/\s+/g,'_'));if(eCats.has(cat)){eCats.delete(cat);lb.classList.remove('checked');for(const p of Object.keys(TAXONOMY[cat].products))eProds.delete(p);}else{eCats.add(cat);lb.classList.add('checked');}eRenderProdAcc();eRenderColorChips();}
 function eRenderProdAcc(){const acc=document.getElementById('editProdAcc');if(!eCats.size){acc.innerHTML='<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div>';return;}acc.innerHTML=[...eCats].map(cat=>`<div class="prod-cat-hd">${cat}</div><div class="prod-items">${Object.keys(TAXONOMY[cat].products).map(p=>`<div class="prod-chip ${eProds.has(p)?'selected':''}" onclick="eToggleProd('${p}')">${p}</div>`).join('')}</div>`).join('');}
 function eToggleProd(p){eProds.has(p)?eProds.delete(p):eProds.add(p);eRenderProdAcc();eRenderColorChips();}
-function eRenderColorChips(){const wrap=document.getElementById('editColorWrap'),all=new Set();for(const cat of eCats)for(const p of eProds){const cs=TAXONOMY[cat]?.products[p];if(cs)cs.forEach(c=>all.add(c));}if(!all.size){wrap.style.display='none';return;}wrap.style.display='block';document.getElementById('editColorChips').innerHTML=[...all].map(c=>`<div class="c-chip ${eColors.has(c)?'selected':''}" onclick="eToggleColor('${c}')">${c}</div>`).join('');}
+function eRenderColorChips(){const wrap=document.getElementById('editColorWrap'),all=new Set();for(const cat of eCats)for(const p of eProds){const cs=TAXONOMY[cat]?.products[p];if(cs)cs.forEach(c=>all.add(c));}if(!all.size){wrap.style.display='none';return;}wrap.style.display='block';document.getElementById('editColorChips').innerHTML=[...all].map(c=>`<div class="c-chip ${eColors.has(c)?'selected':''}" onclick="eToggleColor('${c}')">${c}</div>`).join('');document.getElementById('editCustomColorWrap').style.display=eColors.has('Fritt fargevalg')?'block':'none';}
 function eToggleColor(c){eColors.has(c)?eColors.delete(c):eColors.add(c);eRenderColorChips();}
 function eRenderExtraTags(){document.getElementById('editExtraTags').innerHTML=EXTRA_TAGS.map(t=>`<div class="e-chip ${eExtras.has(t)?'selected':''}" onclick="eToggleExtra(this,'${t}')">${t}</div>`).join('');}
 function eToggleExtra(el,t){eExtras.has(t)?(eExtras.delete(t),el.classList.remove('selected')):(eExtras.add(t),el.classList.add('selected'));}
@@ -575,7 +584,9 @@ async function saveEdit(){
   const saveBtn=document.getElementById('editSaveBtn'),cancelBtn=document.getElementById('editCancelBtn');
   saveBtn.disabled=true; cancelBtn.disabled=true; saveBtn.textContent='Lagrer…';
   const img=images.find(i=>i.id===editId);
-  const meta={title:document.getElementById('editTitle').value.trim()||img.title,categories:[...eCats],products:[...eProds],colors:[...eColors],extras:[...eExtras],credit:document.getElementById('editCredit').value.trim()};
+  const editCustomColor=document.getElementById('editCustomColor').value.trim();
+  const editEffectiveColors=[...eColors].map(c=>c==='Fritt fargevalg'&&editCustomColor?editCustomColor:c);
+  const meta={title:document.getElementById('editTitle').value.trim()||img.title,categories:[...eCats],products:[...eProds],colors:editEffectiveColors,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),customColor:editCustomColor};
   try{
     await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
