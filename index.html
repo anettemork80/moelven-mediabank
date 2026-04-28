@@ -586,7 +586,10 @@ async function saveEdit(){
   const img=images.find(i=>i.id===editId);
   const editCustomColor=document.getElementById('editCustomColor').value.trim();
   const editEffectiveColors=[...eColors].map(c=>c==='Fritt fargevalg'&&editCustomColor?editCustomColor:c);
-  const meta={title:document.getElementById('editTitle').value.trim()||img.title,categories:[...eCats],products:[...eProds],colors:editEffectiveColors,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),customColor:editCustomColor};
+  const typedTitle=document.getElementById('editTitle').value.trim();
+  const autoTitle=['Moelven',...eProds,...editEffectiveColors].filter(Boolean).join(' ');
+  const newTitle=typedTitle||autoTitle;
+  const meta={title:newTitle,categories:[...eCats],products:[...eProds],colors:editEffectiveColors,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),customColor:editCustomColor};
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
   const newFileName=['Moelven',...meta.products,...editEffectiveColors].filter(Boolean).map(s=>s.replace(/\s+/g,'')).join('-')+ext;
   try{
@@ -595,9 +598,17 @@ async function saveEdit(){
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
       body:JSON.stringify({name:newFileName,description:JSON.stringify(meta)})
     });
-    Object.assign(img,meta,{name:newFileName});
+    img.title=newTitle;
+    img.name=newFileName;
+    img.categories=[...eCats];
+    img.products=[...eProds];
+    img.colors=editEffectiveColors;
+    img.extras=[...eExtras];
+    img.credit=document.getElementById('editCredit').value.trim();
+    img.customColor=editCustomColor;
+    closeEditModal();
+    renderAll();
     showToast('Endringer lagret!');
-    closeEditModal(); renderAll();
   } catch(e){ showToast('Feil ved lagring'); }
   saveBtn.disabled=false; cancelBtn.disabled=false; saveBtn.textContent='Lagre endringer';
 }
