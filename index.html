@@ -587,13 +587,15 @@ async function saveEdit(){
   const editCustomColor=document.getElementById('editCustomColor').value.trim();
   const editEffectiveColors=[...eColors].map(c=>c==='Fritt fargevalg'&&editCustomColor?editCustomColor:c);
   const meta={title:document.getElementById('editTitle').value.trim()||img.title,categories:[...eCats],products:[...eProds],colors:editEffectiveColors,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),customColor:editCustomColor};
+  const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
+  const newFileName=['Moelven',...meta.products,...editEffectiveColors].filter(Boolean).map(s=>s.replace(/\s+/g,'')).join('-')+ext;
   try{
     await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({description:JSON.stringify(meta)})
+      body:JSON.stringify({name:newFileName,description:JSON.stringify(meta)})
     });
-    Object.assign(img,meta);
+    Object.assign(img,meta,{name:newFileName});
     showToast('Endringer lagret!');
     closeEditModal(); renderAll();
   } catch(e){ showToast('Feil ved lagring'); }
