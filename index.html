@@ -82,6 +82,7 @@
   .tag-color { background:rgba(226,125,57,0.12); color:#a0561a; }
   .tag-extra { background:var(--bg-blush); color:var(--dark-brown); }
   .tag-size { background:#f0f0ee; color:#6b6560; font-size:9.5px; }
+  .card-credit { font-size:10px; color:var(--text-light); margin-top:4px; font-style:italic; }
 
   .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--teal); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 12px; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -225,7 +226,7 @@
       <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
     </div>
     <div class="form-group">
-      <label class="form-label">Bildetittel</label>
+      <label class="form-label">Bildetittel <em>— genereres automatisk hvis du ikke fyller inn</em></label>
       <input type="text" class="form-input" id="imgTitle" placeholder="F.eks. Heftig PRO+ kledning med terrasse">
     </div>
     <div class="form-group">
@@ -256,6 +257,10 @@
         <div class="e-chip" onclick="toggleExtra(this,'Montasje')">Montasje</div>
         <div class="e-chip" onclick="toggleExtra(this,'Prosjektbilde')">Prosjektbilde</div>
       </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Fotokreditering <em>— fotograf eller byrå</em></label>
+      <input type="text" class="form-input" id="imgCredit" placeholder="F.eks. Johansen Foto AS">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelBtn" onclick="closeModal()">Avbryt</button>
@@ -357,7 +362,7 @@ async function loadImages() {
     images = (data.files || []).map(f => {
       let meta = {};
       try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
-      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], extras:meta.extras||[], thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
+      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], extras:meta.extras||[], credit:meta.credit||'', thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
     });
     renderAll();
   } catch(e) {
@@ -365,9 +370,9 @@ async function loadImages() {
   }
 }
 
-async function uploadToDrive(file, meta) {
+async function uploadToDrive(file, meta, fileName) {
   const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify({ name: file.name, parents: [FOLDER_ID], description: JSON.stringify(meta) })], { type: 'application/json' }));
+  form.append('metadata', new Blob([JSON.stringify({ name: fileName||file.name, parents: [FOLDER_ID], description: JSON.stringify(meta) })], { type: 'application/json' }));
   form.append('file', file);
   return fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,thumbnailLink', {
     method: 'POST', headers: { Authorization: 'Bearer ' + accessToken }, body: form
@@ -414,6 +419,7 @@ function renderGrid() {
           ${img.extras.slice(0,2).map(e=>`<span class="tag tag-extra">${e}</span>`).join('')}
           ${sizeStr?`<span class="tag tag-size">${sizeStr}</span>`:''}
         </div>
+        ${img.credit?`<div class="card-credit">© ${img.credit}</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -436,7 +442,7 @@ async function downloadSelected(){
 
 function openModal(){
   mCats=new Set();mProds=new Set();mColors=new Set();mExtras=new Set();
-  document.getElementById('imgTitle').value='';document.getElementById('filePrev').textContent='';
+  document.getElementById('imgTitle').value='';document.getElementById('filePrev').textContent='';document.getElementById('imgCredit').value='';
   document.querySelectorAll('.e-chip').forEach(e=>e.classList.remove('selected'));
   document.getElementById('progressBar').style.display='none';
   document.getElementById('progressFill').style.width='0%';
@@ -459,11 +465,17 @@ async function saveImage(){
   const saveBtn=document.getElementById('saveBtn'),cancelBtn=document.getElementById('cancelBtn');
   saveBtn.disabled=true;cancelBtn.disabled=true;saveBtn.textContent='Laster opp…';
   document.getElementById('progressBar').style.display='block';
-  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors:[...mColors],extras:[...mExtras]};
+  const credit=document.getElementById('imgCredit').value.trim();
+  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors:[...mColors],extras:[...mExtras],credit};
   let done=0;
   for(const file of pendingFiles){
-    const fm={...meta,title:meta.title||(pendingFiles.length===1?file.name.replace(/\.[^.]+$/,''):file.name)};
-    try{const res=await uploadToDrive(file,fm);images.unshift({id:res.id,name:file.name,...fm,thumbnailLink:res.thumbnailLink});}
+    const ext=file.name.match(/\.[^.]+$/)?.[0]||'';
+    const autoSlug=['Moelven',...meta.categories,...meta.products,...meta.colors].filter(Boolean).map(s=>s.replace(/\s+/g,'')).join('-');
+    const autoTitle=['Moelven',...meta.categories,...meta.products,...meta.colors].filter(Boolean).join(' ');
+    const usedTitle=meta.title||autoTitle;
+    const autoFileName=autoSlug+ext;
+    const fm={...meta,title:usedTitle};
+    try{const res=await uploadToDrive(file,fm,autoFileName);images.unshift({id:res.id,name:autoFileName,...fm,thumbnailLink:res.thumbnailLink});}
     catch(e){showToast('Feil: '+file.name);}
     done++;document.getElementById('progressFill').style.width=Math.round(done/pendingFiles.length*100)+'%';
   }
