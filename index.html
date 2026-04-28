@@ -83,7 +83,7 @@
   .tag-color { background:rgba(226,125,57,0.12); color:#a0561a; }
   .tag-extra { background:var(--bg-blush); color:var(--dark-brown); }
   .tag-size { background:#f0f0ee; color:#6b6560; font-size:12.6px; }
-  .card-credit { font-size:12.6px; color:var(--text-light); margin-top:4px; font-style:italic; }
+  .card-credit { font-size:12.6px; color:var(--text); margin-top:5px; font-weight:500; }
 
   .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--teal); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 12px; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -128,9 +128,10 @@
   .drop-zone:hover { border-color:var(--teal); background:var(--bg-green); }
   .drop-zone p { color:var(--text-light); font-size:14.9px; }
   .drop-zone strong { color:var(--teal); }
-  .img-preview-wrap { display:none; margin-top:10px; display:none; gap:6px; flex-wrap:wrap; }
+  .img-preview-wrap { display:none; margin-top:10px; display:none; gap:8px; flex-wrap:wrap; }
   .img-preview-wrap.show { display:flex; }
-  .img-preview-thumb { width:72px; height:72px; object-fit:cover; border-radius:5px; border:1.5px solid var(--border); }
+  .img-preview-thumb { width:140px; height:140px; object-fit:cover; border-radius:6px; border:1.5px solid var(--border); cursor:zoom-in; }
+  .img-preview-thumb:hover { border-color:var(--teal); }
   .file-prev { margin-top:6px; color:var(--teal-light); font-size:14.4px; font-weight:500; }
   .progress-bar { width:100%; height:4px; background:var(--border); border-radius:2px; margin-top:10px; display:none; }
   .progress-fill { height:100%; background:var(--teal); border-radius:2px; transition:width 0.3s; }
@@ -159,6 +160,8 @@
   .x-btn { background:none; border:none; color:rgba(255,255,255,0.55); cursor:pointer; font-size:18.4px; }
   .toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:var(--dark-brown); color:white; padding:10px 20px; border-radius:6px; font-size:14.9px; z-index:300; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
   .toast.show { opacity:1; }
+  .edit-btn { position:absolute; bottom:7px; left:7px; background:rgba(255,255,255,0.9); border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-family:'Source Sans 3',sans-serif; color:var(--teal); font-weight:600; cursor:pointer; opacity:0; transition:opacity 0.15s; }
+  .card:hover .edit-btn { opacity:1; }
 </style>
 </head>
 <body>
@@ -270,6 +273,42 @@
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelBtn" onclick="closeModal()">Avbryt</button>
       <button class="btn-save" id="saveBtn" onclick="saveImage()">Lagre til mediabank</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-accent"></div><div class="modal-title">Rediger bildedata</div></div>
+    <p class="modal-sub">Endringer lagres tilbake til Google Drive.</p>
+    <div id="editThumbWrap" style="margin-bottom:16px;display:none;"><img id="editThumb" src="" style="width:100%;max-height:200px;object-fit:contain;border-radius:6px;border:1.5px solid var(--border);"></div>
+    <div class="form-group">
+      <label class="form-label">Bildetittel</label>
+      <input type="text" class="form-input" id="editTitle">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Kategorier <em>— velg alle som passer</em></label>
+      <div class="cat-cbs" id="editCatCbs"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Produkter <em>— velg alle som er synlige</em></label>
+      <div class="prod-acc" id="editProdAcc"><div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div></div>
+    </div>
+    <div class="form-group" id="editColorWrap" style="display:none">
+      <label class="form-label">Farger / Varianter</label>
+      <div class="color-chips" id="editColorChips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type bilde</label>
+      <div class="extra-tags" id="editExtraTags"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Fotokreditering <em>— fotograf eller byrå</em></label>
+      <input type="text" class="form-input" id="editCredit">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="editCancelBtn" onclick="closeEditModal()">Avbryt</button>
+      <button class="btn-save" id="editSaveBtn" onclick="saveEdit()">Lagre endringer</button>
     </div>
   </div>
 </div>
@@ -415,7 +454,7 @@ function renderGrid() {
         ${img.categories.length>1?`<div class="multi-badge">${img.categories.length} kat.</div>`:''}
         <div class="card-check">✓</div>
         ${thumb?`<div class="zoom-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3.5" stroke="#473b33" stroke-width="1.2"/><path d="M8 8l2.5 2.5" stroke="#473b33" stroke-width="1.2" stroke-linecap="round"/></svg></div>`:''}
-      </div>
+        <button class="edit-btn" onclick="event.stopPropagation();openEditModal('${img.id}')">Rediger</button>      </div>
       <div class="card-body">
         <div class="card-name">${img.title}</div>
         <div class="card-tags">
@@ -499,6 +538,58 @@ async function saveImage(){
   saveBtn.disabled=false;cancelBtn.disabled=false;saveBtn.textContent='Lagre til mediabank';
   closeModal();renderAll();showToast(`${done} bilde${done!==1?'r':''} lastet opp!`);
 }
+
+let editId=null, eCats=new Set(), eProds=new Set(), eColors=new Set(), eExtras=new Set();
+const EXTRA_TAGS=['Interiør','Eksteriør','Miljøbilde','Produktbilde','Detalj','Hus','Hytte','Leilighet','Nybygg','Rehabilitering','Montasje','Prosjektbilde'];
+
+function openEditModal(id){
+  const img=images.find(i=>i.id===id); if(!img) return;
+  editId=id;
+  eCats=new Set(img.categories||[]);
+  eProds=new Set(img.products||[]);
+  eColors=new Set(img.colors||[]);
+  eExtras=new Set(img.extras||[]);
+  document.getElementById('editTitle').value=img.title||'';
+  document.getElementById('editCredit').value=img.credit||'';
+  if(img.thumbnailLink){
+    document.getElementById('editThumb').src=img.thumbnailLink.replace('=s220','=s800');
+    document.getElementById('editThumbWrap').style.display='block';
+  } else {
+    document.getElementById('editThumbWrap').style.display='none';
+  }
+  document.getElementById('editCatCbs').innerHTML=Object.keys(TAXONOMY).map(cat=>`<div class="cat-cb ${eCats.has(cat)?'checked':''}" id="ecb_${cat.replace(/\s+/g,'_')}" onclick="eToggleCat('${cat}')"><div class="cat-cb-box"><div class="cat-cb-check"></div></div>${cat}</div>`).join('');
+  eRenderProdAcc(); eRenderColorChips(); eRenderExtraTags();
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEditModal(){document.getElementById('editModal').classList.remove('open');editId=null;}
+function eToggleCat(cat){const lb=document.getElementById('ecb_'+cat.replace(/\s+/g,'_'));if(eCats.has(cat)){eCats.delete(cat);lb.classList.remove('checked');for(const p of Object.keys(TAXONOMY[cat].products))eProds.delete(p);}else{eCats.add(cat);lb.classList.add('checked');}eRenderProdAcc();eRenderColorChips();}
+function eRenderProdAcc(){const acc=document.getElementById('editProdAcc');if(!eCats.size){acc.innerHTML='<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div>';return;}acc.innerHTML=[...eCats].map(cat=>`<div class="prod-cat-hd">${cat}</div><div class="prod-items">${Object.keys(TAXONOMY[cat].products).map(p=>`<div class="prod-chip ${eProds.has(p)?'selected':''}" onclick="eToggleProd('${p}')">${p}</div>`).join('')}</div>`).join('');}
+function eToggleProd(p){eProds.has(p)?eProds.delete(p):eProds.add(p);eRenderProdAcc();eRenderColorChips();}
+function eRenderColorChips(){const wrap=document.getElementById('editColorWrap'),all=new Set();for(const cat of eCats)for(const p of eProds){const cs=TAXONOMY[cat]?.products[p];if(cs)cs.forEach(c=>all.add(c));}if(!all.size){wrap.style.display='none';return;}wrap.style.display='block';document.getElementById('editColorChips').innerHTML=[...all].map(c=>`<div class="c-chip ${eColors.has(c)?'selected':''}" onclick="eToggleColor('${c}')">${c}</div>`).join('');}
+function eToggleColor(c){eColors.has(c)?eColors.delete(c):eColors.add(c);eRenderColorChips();}
+function eRenderExtraTags(){document.getElementById('editExtraTags').innerHTML=EXTRA_TAGS.map(t=>`<div class="e-chip ${eExtras.has(t)?'selected':''}" onclick="eToggleExtra(this,'${t}')">${t}</div>`).join('');}
+function eToggleExtra(el,t){eExtras.has(t)?(eExtras.delete(t),el.classList.remove('selected')):(eExtras.add(t),el.classList.add('selected'));}
+
+async function saveEdit(){
+  if(!editId) return;
+  const saveBtn=document.getElementById('editSaveBtn'),cancelBtn=document.getElementById('editCancelBtn');
+  saveBtn.disabled=true; cancelBtn.disabled=true; saveBtn.textContent='Lagrer…';
+  const img=images.find(i=>i.id===editId);
+  const meta={title:document.getElementById('editTitle').value.trim()||img.title,categories:[...eCats],products:[...eProds],colors:[...eColors],extras:[...eExtras],credit:document.getElementById('editCredit').value.trim()};
+  try{
+    await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
+      method:'PATCH',
+      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({description:JSON.stringify(meta)})
+    });
+    Object.assign(img,meta);
+    showToast('Endringer lagret!');
+    closeEditModal(); renderAll();
+  } catch(e){ showToast('Feil ved lagring'); }
+  saveBtn.disabled=false; cancelBtn.disabled=false; saveBtn.textContent='Lagre endringer';
+}
+
+document.getElementById('editModal').addEventListener('click',e=>{if(e.target===document.getElementById('editModal'))closeEditModal();});
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
 
