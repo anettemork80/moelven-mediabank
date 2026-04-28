@@ -90,6 +90,8 @@
   .loading-grid { grid-column:1/-1; text-align:center; padding:56px 20px; color:var(--text-light); font-size:14.9px; }
   .empty { grid-column:1/-1; text-align:center; padding:56px 20px; }
   .empty p { font-size:16.1px; color:var(--text-light); margin-top:12px; }
+  .empty-hint { margin-top:14px; font-size:15px; color:var(--text-light); }
+  .empty-hint a { color:var(--teal); font-weight:600; text-decoration:underline; cursor:pointer; }
 
   .lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:500; align-items:center; justify-content:center; }
   .lightbox.open { display:flex; }
@@ -126,6 +128,7 @@
   .form-input:focus { border-color:var(--teal); }
   .drop-zone { border:2px dashed var(--border); border-radius:7px; padding:24px; text-align:center; cursor:pointer; transition:all 0.15s; background:var(--bg-cream); }
   .drop-zone:hover { border-color:var(--teal); background:var(--bg-green); }
+  .drop-zone.dragover { border-color:var(--teal); background:var(--bg-green); transform:scale(1.01); }
   .drop-zone p { color:var(--text-light); font-size:14.9px; }
   .drop-zone strong { color:var(--teal); }
   .img-preview-wrap { display:none; margin-top:10px; display:none; gap:8px; flex-wrap:wrap; }
@@ -224,7 +227,7 @@
     <div class="modal-head"><div class="modal-accent"></div><div class="modal-title">Last opp bilde</div></div>
     <p class="modal-sub">Bildet lagres i Google Drive og tagges med kategorier og produkter.</p>
     <div class="form-group">
-      <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
         <svg style="width:32px;height:32px;margin:0 auto 10px;display:block;opacity:0.25" viewBox="0 0 32 32" fill="none"><rect x="2" y="6" width="28" height="20" rx="2" stroke="#473b33" stroke-width="2"/><circle cx="11" cy="13" r="2.5" stroke="#473b33" stroke-width="2"/><path d="M2 22l7-5 5 4 5-6 11 7" stroke="#473b33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <p>Dra og slipp bilder her, eller <strong>velg fra PC</strong></p>
         <div class="file-prev" id="filePrev"></div>
@@ -449,7 +452,28 @@ function renderGrid() {
   document.getElementById('resultCount').textContent=`${f.length} bilde${f.length!==1?'r':''}`;
   document.getElementById('statsText').textContent=`${images.length} bilder`;
   const g=document.getElementById('grid');
-  if(!f.length){g.innerHTML=`<div class="empty"><p>${images.length?'Ingen bilder matcher søket.':'Ingen bilder ennå. Trykk «Last opp bilde» for å starte!'}</p></div>`;return;}
+  if(!f.length){
+    let emptyMsg='';
+    if(!images.length){
+      emptyMsg=`<div class="empty"><p>Ingen bilder ennå. Trykk «Last opp bilde» for å starte!</p></div>`;
+    } else if(searchQ && activeCat){
+      const allResults=images.filter(i=>{const q=searchQ.toLowerCase();return[i.title,...i.categories,...i.products,...i.colors,...i.extras].some(x=>x&&x.toLowerCase().includes(q));});
+      if(allResults.length){
+        emptyMsg=`<div class="empty">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="opacity:0.25;margin:0 auto"><circle cx="18" cy="18" r="12" stroke="#473b33" stroke-width="2.5"/><path d="M27 27l8 8" stroke="#473b33" stroke-width="2.5" stroke-linecap="round"/></svg>
+          <p>Ingen treff på «${searchQ}» i <strong>${activeCat}</strong>.</p>
+          <p class="empty-hint">Fant ${allResults.length} bilde${allResults.length!==1?'r':''} i andre kategorier – <a onclick="nav(null)">søk i alle bilder</a></p>
+        </div>`;
+      } else {
+        emptyMsg=`<div class="empty"><p>Ingen bilder matcher «${searchQ}».</p></div>`;
+      }
+    } else if(searchQ){
+      emptyMsg=`<div class="empty"><p>Ingen bilder matcher «${searchQ}».</p></div>`;
+    } else {
+      emptyMsg=`<div class="empty"><p>Ingen bilder i denne kategorien ennå.</p></div>`;
+    }
+    g.innerHTML=emptyMsg; return;
+  }
   g.innerHTML=f.map(img=>{
     const thumb=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s400'):'';
     const full=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s1600'):'';
@@ -624,6 +648,11 @@ function closeLightbox(e){if(e.target===document.getElementById('lightbox'))docu
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('lightbox').classList.remove('open');});
 document.getElementById('searchInput').addEventListener('input',function(){searchQ=this.value;renderGrid();});
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
+
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave',e=>{if(!dz.contains(e.relatedTarget))dz.classList.remove('dragover');});
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');if(e.dataTransfer.files.length)handleFiles(e.dataTransfer.files);});
 </script>
 </body>
 </html>
