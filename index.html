@@ -197,6 +197,21 @@
   .market-chip { padding:6px 14px; border:1.5px solid var(--border); border-radius:20px; font-size:13px; cursor:pointer; background:white; color:var(--text); transition:all 0.12s; }
   .market-chip:hover { border-color:var(--teal); }
   .market-chip.selected { background:var(--teal); border-color:var(--teal); color:white; }
+
+  /* Inbox */
+  .inbox-item { display:flex; align-items:center; padding:9px 18px; cursor:pointer; font-size:14px; color:rgba(12,55,61,0.8); border-left:3px solid var(--orange); background:rgba(226,125,57,0.06); gap:8px; }
+  .inbox-item:hover { background:rgba(226,125,57,0.12); }
+  .inbox-badge { background:var(--orange); color:white; border-radius:10px; font-size:11px; font-weight:700; padding:1px 6px; margin-left:auto; }
+  .inbox-modal-grid { display:grid; gap:12px; }
+  .inbox-card { background:var(--bg-cream); border-radius:8px; overflow:hidden; border:1.5px solid var(--border); display:flex; gap:12px; padding:12px; align-items:flex-start; }
+  .inbox-thumb { width:80px; height:80px; object-fit:cover; border-radius:5px; flex-shrink:0; background:#e8e0d8; }
+  .inbox-info { flex:1; min-width:0; }
+  .inbox-title { font-weight:600; font-size:14px; color:var(--text); margin-bottom:4px; }
+  .inbox-meta { font-size:12px; color:var(--text-light); margin-bottom:8px; }
+  .inbox-actions { display:flex; gap:8px; }
+  .inbox-approve-btn { background:var(--teal); color:white; border:none; border-radius:4px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Source Sans 3',sans-serif; }
+  .inbox-edit-btn { background:white; color:var(--teal); border:1.5px solid var(--teal); border-radius:4px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Source Sans 3',sans-serif; }
+  .inbox-from { display:inline-block; background:rgba(12,76,81,0.08); color:var(--teal); border-radius:3px; font-size:11px; padding:1px 6px; margin-bottom:6px; }
 </style>
 </head>
 <body>
@@ -286,12 +301,12 @@
 
 <div class="overlay" id="modal">
   <div class="modal">
-    <div class="modal-head"><div class="modal-accent"></div><div class="modal-title">Last opp bilde</div></div>
-    <p class="modal-sub">Bildet lagres i Google Drive og tagges med kategorier og produkter.</p>
+    <div class="modal-head"><div class="modal-accent"></div><div class="modal-title" id="modalTitle">Last opp bilde</div></div>
+    <p class="modal-sub" id="modalSub">Bildet lagres i Google Drive og tagges med kategorier og produkter.</p>
     <div class="form-group">
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
         <svg style="width:32px;height:32px;margin:0 auto 10px;display:block;opacity:0.25" viewBox="0 0 32 32" fill="none"><rect x="2" y="6" width="28" height="20" rx="2" stroke="#473b33" stroke-width="2"/><circle cx="11" cy="13" r="2.5" stroke="#473b33" stroke-width="2"/><path d="M2 22l7-5 5 4 5-6 11 7" stroke="#473b33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <p>Dra og slipp bilder her, eller <strong>velg fra PC</strong></p>
+        <p id="dropText">Dra og slipp bilder her, eller <strong id="dropTextLink">velg fra PC</strong></p>
         <div class="file-prev" id="filePrev"></div>
       </div>
       <input type="file" id="fileInput" accept="image/*,.tif,.tiff" multiple style="display:none" onchange="handleFiles(this.files)">
@@ -353,8 +368,8 @@
 
 <div class="overlay" id="editModal">
   <div class="modal">
-    <div class="modal-head"><div class="modal-accent"></div><div class="modal-title">Rediger bildedata</div></div>
-    <p class="modal-sub">Endringer lagres tilbake til Google Drive.</p>
+    <div class="modal-head"><div class="modal-accent"></div><div class="modal-title" id="editModalTitle">Rediger bildedata</div></div>
+    <p class="modal-sub" id="editModalSub">Endringer lagres tilbake til Google Drive.</p>
     <div id="editThumbWrap" style="margin-bottom:16px;display:none;"><img id="editThumb" src="" style="width:100%;max-height:200px;object-fit:contain;border-radius:6px;border:1.5px solid var(--border);"></div>
     <div class="form-group">
       <label class="form-label">Bildetittel</label>
@@ -395,6 +410,17 @@
   </div>
 </div>
 
+<div class="overlay" id="inboxModal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-accent" style="background:var(--orange)"></div><div class="modal-title" id="inboxModalTitle">Innboks</div></div>
+    <p class="modal-sub" id="inboxModalSub">Disse bildene er delt fra andre markeder og venter på lokale tagger.</p>
+    <div id="inboxGrid" class="inbox-modal-grid"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('inboxModal').classList.remove('open')">Lukk</button>
+    </div>
+  </div>
+</div>
+
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
   <div class="lightbox-inner">
     <button class="lightbox-close" onclick="document.getElementById('lightbox').classList.remove('open')">✕</button>
@@ -424,9 +450,9 @@ let currentCountry = localStorage.getItem('moelven_country') || null;
 
 // Per-country strings
 const STRINGS = {
-  no: { search:'Søk på produkt, farge, tema…', upload:'Last opp bilde', allImages:'Alle bilder', categories:'Kategorier', noResults:'Ingen bilder matcher søket.', noImages:'Ingen bilder ennå. Trykk «Last opp bilde» for å starte!', searchInCat:'Ingen treff på', inCat:'i', tryAll:'søk i alle bilder', foundIn:'Fant', otherCats:'bilder i andre kategorier –', logout:'Logg ut', login:'Logg inn med Google', saving:'Lagrer…', uploading:'Laster opp…', saveBtn:'Lagre til mediabank', cancel:'Avbryt', saveChanges:'Lagre endringer', marketLabel:'Marked', marketSub:'— velg alle som gjelder', creditLabel:'Fotokreditering', creditSub:'— fotograf eller byrå', titleLabel:'Bildetittel', titleSub:'— genereres automatisk hvis du ikke fyller inn', categoriesLabel:'Kategorier', catSub:'— velg alle som passer', productsLabel:'Produkter', prodSub:'— velg alle som er synlige, og velg farge der det er aktuelt', typeLabel:'Type bilde', profileLabel:'Profil', uploadTitle:'Last opp bilde', uploadSub:'Bildet lagres i Google Drive og tagges med kategorier og produkter.', editTitle:'Rediger bildedata', editSub:'Endringer lagres tilbake til Google Drive.', changeCountry:'🇳🇴 Bytt marked', velgKat:'Velg kategorier ovenfor' },
-  se: { search:'Sök på produkt, färg, tema…', upload:'Ladda upp bild', allImages:'Alla bilder', categories:'Kategorier', noResults:'Inga bilder matchar söket.', noImages:'Inga bilder ännu. Tryck «Ladda upp bild» för att börja!', searchInCat:'Inga träffar på', inCat:'i', tryAll:'sök i alla bilder', foundIn:'Hittade', otherCats:'bilder i andra kategorier –', logout:'Logga ut', login:'Logga in med Google', saving:'Sparar…', uploading:'Laddar upp…', saveBtn:'Spara till mediabank', cancel:'Avbryt', saveChanges:'Spara ändringar', marketLabel:'Marknad', marketSub:'— välj alla som gäller', creditLabel:'Fotokreditering', creditSub:'— fotograf eller byrå', titleLabel:'Bildtitel', titleSub:'— genereras automatiskt om du inte fyller i', categoriesLabel:'Kategorier', catSub:'— välj alla som passar', productsLabel:'Produkter', prodSub:'— välj alla som syns, och välj färg där det är aktuellt', typeLabel:'Typ av bild', profileLabel:'Profil', uploadTitle:'Ladda upp bild', uploadSub:'Bilden sparas i Google Drive och taggas med kategorier och produkter.', editTitle:'Redigera bilddata', editSub:'Ändringar sparas tillbaka till Google Drive.', changeCountry:'🇸🇪 Byt marknad', velgKat:'Välj kategorier ovan' },
-  dk: { search:'Søg på produkt, farve, tema…', upload:'Upload billede', allImages:'Alle billeder', categories:'Kategorier', noResults:'Ingen billeder matcher søgningen.', noImages:'Ingen billeder endnu. Klik «Upload billede» for at starte!', searchInCat:'Ingen resultater for', inCat:'i', tryAll:'søg i alle billeder', foundIn:'Fandt', otherCats:'billeder i andre kategorier –', logout:'Log ud', login:'Log ind med Google', saving:'Gemmer…', uploading:'Uploader…', saveBtn:'Gem til mediabank', cancel:'Annuller', saveChanges:'Gem ændringer', marketLabel:'Marked', marketSub:'— vælg alle der gælder', creditLabel:'Fotokreditering', creditSub:'— fotograf eller bureau', titleLabel:'Billedtitel', titleSub:'— genereres automatisk hvis du ikke udfylder', categoriesLabel:'Kategorier', catSub:'— vælg alle der passer', productsLabel:'Produkter', prodSub:'— vælg alle der er synlige, og vælg farve hvor det er relevant', typeLabel:'Billedtype', profileLabel:'Profil', uploadTitle:'Upload billede', uploadSub:'Billedet gemmes i Google Drive og tagges med kategorier og produkter.', editTitle:'Rediger billeddata', editSub:'Ændringer gemmes tilbage til Google Drive.', changeCountry:'🇩🇰 Skift marked', velgKat:'Vælg kategorier ovenfor' }
+  no: { search:'Søk på produkt, farge, tema…', upload:'Last opp bilde', allImages:'Alle bilder', inbox:'Innboks', categories:'Kategorier', noResults:'Ingen bilder matcher søket.', noImages:'Ingen bilder ennå. Trykk «Last opp bilde» for å starte!', searchInCat:'Ingen treff på', inCat:'i', tryAll:'søk i alle bilder', foundIn:'Fant', otherCats:'bilder i andre kategorier –', logout:'Logg ut', login:'Logg inn med Google', saving:'Lagrer…', uploading:'Laster opp…', saveBtn:'Lagre til mediabank', cancel:'Avbryt', saveChanges:'Lagre endringer', marketLabel:'Marked', marketSub:'— velg alle som gjelder', creditLabel:'Fotokreditering', creditSub:'— fotograf eller byrå', titleLabel:'Bildetittel', titleSub:'— genereres automatisk hvis du ikke fyller inn', categoriesLabel:'Kategorier', catSub:'— velg alle som passer', productsLabel:'Produkter', prodSub:'— velg alle som er synlige, og velg farge der det er aktuelt', typeLabel:'Type bilde', profileLabel:'Profil', uploadTitle:'Last opp bilde', uploadSub:'Bildet lagres i Google Drive og tagges med kategorier og produkter.', editTitle:'Rediger bildedata', editSub:'Endringer lagres tilbake til Google Drive.', dropText:'Dra og slipp bilder her, eller', dropLink:'velg fra PC', changeCountry:'🇳🇴 Bytt marked', velgKat:'Velg kategorier ovenfor', inboxTitle:'Innboks', inboxSub:'Disse bildene er delt fra andre markeder og venter på lokale tagger.', inboxApprove:'Godkjenn og publiser', inboxEdit:'Rediger tagger', inboxEmpty:'Ingen bilder i innboksen.' },
+  se: { search:'Sök på produkt, färg, tema…', upload:'Ladda upp bild', allImages:'Alla bilder', inbox:'Inkorg', categories:'Kategorier', noResults:'Inga bilder matchar söket.', noImages:'Inga bilder ännu. Tryck «Ladda upp bild» för att börja!', searchInCat:'Inga träffar på', inCat:'i', tryAll:'sök i alla bilder', foundIn:'Hittade', otherCats:'bilder i andra kategorier –', logout:'Logga ut', login:'Logga in med Google', saving:'Sparar…', uploading:'Laddar upp…', saveBtn:'Spara till mediabank', cancel:'Avbryt', saveChanges:'Spara ändringar', marketLabel:'Marknad', marketSub:'— välj alla som gäller', creditLabel:'Fotokreditering', creditSub:'— fotograf eller byrå', titleLabel:'Bildtitel', titleSub:'— genereras automatiskt om du inte fyller i', categoriesLabel:'Kategorier', catSub:'— välj alla som passar', productsLabel:'Produkter', prodSub:'— välj alla som syns, och välj färg där det är aktuellt', typeLabel:'Typ av bild', profileLabel:'Profil', uploadTitle:'Ladda upp bild', uploadSub:'Bilden sparas i Google Drive och taggas med kategorier och produkter.', editTitle:'Redigera bilddata', editSub:'Ändringar sparas tillbaka till Google Drive.', dropText:'Dra och släpp bilder här, eller', dropLink:'välj från datorn', changeCountry:'🇸🇪 Byt marknad', velgKat:'Välj kategorier ovan', inboxTitle:'Inkorg', inboxSub:'Dessa bilder är delade från andra marknader och väntar på lokala taggar.', inboxApprove:'Godkänn och publicera', inboxEdit:'Redigera taggar', inboxEmpty:'Inga bilder i inkorgen.' },
+  dk: { search:'Søg på produkt, farve, tema…', upload:'Upload billede', allImages:'Alle billeder', inbox:'Indbakke', categories:'Kategorier', noResults:'Ingen billeder matcher søgningen.', noImages:'Ingen billeder endnu. Klik «Upload billede» for at starte!', searchInCat:'Ingen resultater for', inCat:'i', tryAll:'søg i alle billeder', foundIn:'Fandt', otherCats:'billeder i andre kategorier –', logout:'Log ud', login:'Log ind med Google', saving:'Gemmer…', uploading:'Uploader…', saveBtn:'Gem til mediabank', cancel:'Annuller', saveChanges:'Gem ændringer', marketLabel:'Marked', marketSub:'— vælg alle der gælder', creditLabel:'Fotokreditering', creditSub:'— fotograf eller bureau', titleLabel:'Billedtitel', titleSub:'— genereres automatisk hvis du ikke udfylder', categoriesLabel:'Kategorier', catSub:'— vælg alle der passer', productsLabel:'Produkter', prodSub:'— vælg alle der er synlige, og vælg farve hvor det er relevant', typeLabel:'Billedtype', profileLabel:'Profil', uploadTitle:'Upload billede', uploadSub:'Billedet gemmes i Google Drive og tagges med kategorier og produkter.', editTitle:'Rediger billeddata', editSub:'Ændringer gemmes tilbage til Google Drive.', dropText:'Træk og slip billeder her, eller', dropLink:'vælg fra computer', changeCountry:'🇩🇰 Skift marked', velgKat:'Vælg kategorier ovenfor', inboxTitle:'Indbakke', inboxSub:'Disse billeder er delt fra andre markeder og venter på lokale tags.', inboxApprove:'Godkend og publicer', inboxEdit:'Rediger tags', inboxEmpty:'Ingen billeder i indbakken.' }
 };
 
 // Per-country taxonomy
@@ -520,6 +546,13 @@ function applyStrings(){
   const esb=document.getElementById('editSaveBtn');if(esb)esb.textContent=S.saveChanges;
   const ecb=document.getElementById('editCancelBtn');if(ecb)ecb.textContent=S.cancel;
 
+  // Modal titles
+  const mt=document.getElementById('modalTitle');if(mt)mt.textContent=S.uploadTitle;
+  const ms=document.getElementById('modalSub');if(ms)ms.textContent=S.uploadSub;
+  const dt=document.getElementById('dropText');if(dt)dt.childNodes[0].textContent=S.dropText+' ';
+  const dl=document.getElementById('dropTextLink');if(dl)dl.textContent=S.dropLink;
+  const emt=document.getElementById('editModalTitle');if(emt)emt.textContent=S.editTitle;
+  const ems=document.getElementById('editModalSub');if(ems)ems.textContent=S.editSub;
   // Country change button
   const ccb=document.getElementById('countryChangeBtn');if(ccb)ccb.textContent=S.changeCountry;
 }
@@ -596,7 +629,7 @@ async function loadImages() {
     images = (data.files || []).map(f => {
       let meta = {};
       try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
-      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
+      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], localTags:meta.localTags||null, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
     });
     renderAll();
   } catch(e) {
@@ -614,11 +647,27 @@ async function uploadToDrive(file, meta, fileName) {
 }
 
 function renderSidebar() {
-  let h=`<div class="cat-item ${!activeCat?'active':''}" onclick="nav(null)"><span class="cat-name">Alle bilder</span><span class="cat-count">${images.length}</span></div><div class="sidebar-label">Kategorier</div>`;
+  // Inbox: images tagged for current country but not yet locally tagged (approved)
+  const inboxImages = currentCountry ? images.filter(i=>
+    i.markets && i.markets.includes(currentCountry) &&
+    i.markets.length > 1 &&
+    !i.approvedMarkets?.includes(currentCountry) &&
+    !i.markets.filter(m=>m!==currentCountry).every(m=>false) // from another market
+  ).filter(i=> {
+    // Only show in inbox if the image was "sent" from another market (has tags from another market's taxonomy)
+    const otherMarkets = i.markets.filter(m=>m!==currentCountry);
+    return otherMarkets.length > 0 && !(i.localTags?.[currentCountry]);
+  }) : [];
+
+  let h='';
+  if(inboxImages.length){
+    h+=`<div class="inbox-item" onclick="openInbox()"><span>${S.inboxTitle}</span><span class="inbox-badge">${inboxImages.length}</span></div>`;
+  }
+  h+=`<div class="cat-item ${!activeCat?'active':''}" onclick="nav(null)"><span class="cat-name">${S.allImages}</span><span class="cat-count">${images.filter(i=>!currentCountry||!i.markets||i.markets.length===0||i.markets.includes(currentCountry)).length}</span></div><div class="sidebar-label">${S.categories}</div>`;
   for(const[cat,d]of Object.entries(TAXONOMY)){
-    const cnt=images.filter(i=>i.categories.includes(cat)).length,on=activeCat===cat;
+    const cnt=images.filter(i=>i.categories.includes(cat)&&(!currentCountry||!i.markets||i.markets.length===0||i.markets.includes(currentCountry))).length,on=activeCat===cat;
     h+=`<div><div class="cat-item ${on?'active':''}" onclick="nav('${cat}')"><span class="cat-name">${cat}</span><span class="cat-count">${cnt}</span></div><div class="subcat-list ${on?'open':''}">`;
-    for(const p of Object.keys(d.products)){const pc=images.filter(i=>i.products.includes(p)).length;h+=`<div class="subcat-item ${activeProd===p?'active':''}" onclick="navProd('${p}')"><span>${p}</span>${pc?`<span style="font-size:10px;opacity:0.45">${pc}</span>`:''}</div>`;}
+    for(const p of Object.keys(d.products)){const pc=images.filter(i=>i.products.includes(p)&&(!currentCountry||!i.markets||i.markets.length===0||i.markets.includes(currentCountry))).length;h+=`<div class="subcat-item ${activeProd===p?'active':''}" onclick="navProd('${p}')"><span>${p}</span>${pc?`<span style="font-size:10px;opacity:0.45">${pc}</span>`:''}</div>`;}
     h+=`</div></div>`;
   }
   document.getElementById('sidebar').innerHTML=h;
@@ -924,6 +973,62 @@ async function saveEdit(){
   saveBtn.disabled=false; cancelBtn.disabled=false; saveBtn.textContent='Lagre endringer';
 }
 document.getElementById('editModal').addEventListener('click',e=>{if(e.target===document.getElementById('editModal'))closeEditModal();});
+
+function openInbox(){
+  const countryNames={no:'Norge',se:'Sverige',dk:'Danmark'};
+  const inboxImages=images.filter(i=>
+    i.markets&&i.markets.includes(currentCountry)&&
+    i.markets.length>1&&
+    !(i.localTags?.[currentCountry])
+  );
+  const grid=document.getElementById('inboxGrid');
+  document.getElementById('inboxModalTitle').textContent=S.inboxTitle;
+  document.getElementById('inboxModalSub').textContent=S.inboxSub;
+  if(!inboxImages.length){
+    grid.innerHTML=`<p style="color:var(--text-light);text-align:center;padding:20px">${S.inboxEmpty}</p>`;
+  } else {
+    grid.innerHTML=inboxImages.map(img=>{
+      const thumb=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s400'):'';
+      const from=img.markets.filter(m=>m!==currentCountry).map(m=>countryNames[m]||m).join(', ');
+      return`<div class="inbox-card">
+        ${thumb?`<img class="inbox-thumb" src="${thumb}" alt="">`:`<div class="inbox-thumb"></div>`}
+        <div class="inbox-info">
+          <div class="inbox-from">Fra: ${from}</div>
+          <div class="inbox-title">${img.title}</div>
+          <div class="inbox-meta">${img.categories.join(', ')}${img.colors.length?' · '+img.colors.join(', '):''}</div>
+          <div class="inbox-actions">
+            <button class="inbox-edit-btn" onclick="approveFromInbox('${img.id}',true)">${S.inboxEdit}</button>
+            <button class="inbox-approve-btn" onclick="approveFromInbox('${img.id}',false)">${S.inboxApprove}</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('inboxModal').classList.add('open');
+}
+
+async function approveFromInbox(id, openEdit){
+  const img=images.find(i=>i.id===id);
+  if(!img) return;
+  // Mark as locally approved for this market
+  if(!img.localTags) img.localTags={};
+  img.localTags[currentCountry]=true;
+  // Save to Drive
+  const meta={...img};
+  try{
+    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
+      method:'PATCH',
+      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({description:JSON.stringify(meta)})
+    });
+    document.getElementById('inboxModal').classList.remove('open');
+    renderAll();
+    showToast(openEdit?'Åpner for redigering…':'Bilde publisert i '+S.allImages+'!');
+    if(openEdit) setTimeout(()=>openEditModal(id),300);
+  } catch(e){ showToast('Feil ved godkjenning'); }
+}
+
+document.getElementById('inboxModal').addEventListener('click',e=>{if(e.target===document.getElementById('inboxModal'))document.getElementById('inboxModal').classList.remove('open');});
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
 
