@@ -815,8 +815,11 @@ async function uploadToDrive(file, meta, fileName) {
 }
 
 function getImgMeta(img){
-  if(currentCountry && img.uploadedBy !== currentCountry && img.localMeta?.[currentCountry]){
+  const isOther = currentCountry && img.uploadedBy !== currentCountry;
+  const hasLocal = img.localMeta?.[currentCountry];
+  if(isOther && hasLocal){
     const local=img.localMeta[currentCountry];
+    console.log('[getImgMeta] Using localMeta for', img.name, 'country:', currentCountry, 'local:', local);
     return {
       title: local.title||img.title,
       categories: local.categories!==undefined ? local.categories : img.categories,
@@ -827,6 +830,7 @@ function getImgMeta(img){
       profile: local.profile!==undefined ? local.profile : img.profile
     };
   }
+  if(isOther) console.log('[getImgMeta] NO localMeta for', img.name, 'uploadedBy:', img.uploadedBy, 'country:', currentCountry, 'localMeta:', img.localMeta);
   return img;
 }
 
