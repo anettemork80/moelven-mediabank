@@ -794,9 +794,7 @@ async function loadImages() {
     images = (data.files || []).map(f => {
       let meta = {};
       try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
-      if(meta.localMeta && Object.keys(meta.localMeta).length) console.log('[loadImages] localMeta found for', f.name, meta.localMeta);
-      else if(meta.markets && meta.markets.length > 1) console.log('[loadImages] cross-market but NO localMeta for', f.name, 'description length:', (f.description||'').length);
-      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, localMeta:meta.localMeta||{}, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
+      if(meta.localMeta && Object.keys(meta.localMeta).length)      else if(meta.markets && meta.markets.length > 1)      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, localMeta:meta.localMeta||{}, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
     });
     renderAll();
   } catch(e) {
@@ -815,11 +813,9 @@ async function uploadToDrive(file, meta, fileName) {
 }
 
 function getImgMeta(img){
-  const isOther = currentCountry && img.uploadedBy !== currentCountry;
-  const hasLocal = img.localMeta?.[currentCountry];
-  if(isOther && hasLocal){
+  // Use localMeta for current country whenever it exists
+  if(currentCountry && img.localMeta?.[currentCountry]){
     const local=img.localMeta[currentCountry];
-    console.log('[getImgMeta] Using localMeta for', img.name, 'country:', currentCountry, 'local:', local);
     return {
       title: local.title||img.title,
       categories: local.categories!==undefined ? local.categories : img.categories,
@@ -830,7 +826,6 @@ function getImgMeta(img){
       profile: local.profile!==undefined ? local.profile : img.profile
     };
   }
-  if(isOther) console.log('[getImgMeta] NO localMeta for', img.name, 'uploadedBy:', img.uploadedBy, 'country:', currentCountry, 'localMeta:', img.localMeta);
   return img;
 }
 
@@ -1199,13 +1194,7 @@ async function saveEdit(){
     if(!img.localMeta) img.localMeta={};
     img.localMeta[currentCountry]=localData;
     if(!img.localTags) img.localTags={};
-    img.localTags[currentCountry]=true;
-    console.log('[saveEdit] localData:', JSON.stringify(localData));
-    console.log('[saveEdit] img.localMeta after set:', JSON.stringify(img.localMeta));
-    console.log('[saveEdit] isFromOtherMarket:', isFromOtherMarket, 'currentCountry:', currentCountry, 'uploadedBy:', img.uploadedBy);
-    metaToSave=buildCleanMeta(img);
-    console.log('[saveEdit] metaToSave.localMeta:', JSON.stringify(metaToSave.localMeta));
-    newFileName=img.name;
+    img.localTags[currentCountry]=true;    metaToSave=buildCleanMeta(img);    newFileName=img.name;
   } else {
     newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
     img.title=newTitle; img.name=newFileName;
@@ -1216,17 +1205,12 @@ async function saveEdit(){
     metaToSave=buildCleanMeta(img);
   }
 
-  try{
-    console.log('[saveEdit] Saving to Drive:', JSON.stringify(metaToSave).length, 'chars', metaToSave);
-    const patchResp=await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
+  try{    const patchResp=await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
       body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
     });
-    const patchData=await patchResp.json();
-    console.log('[saveEdit] PATCH response status:', patchResp.status, 'description saved length:', JSON.stringify(metaToSave).length);
-    if(!patchResp.ok) console.error('[saveEdit] PATCH error:', patchData);
-    closeEditModal();
+    const patchData=await patchResp.json();    if(!patchResp.ok)    closeEditModal();
     renderAll();
     showToast(S.savedOk);
   } catch(e){ showToast(S.saveError); }
