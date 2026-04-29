@@ -629,7 +629,7 @@ async function loadImages() {
     images = (data.files || []).map(f => {
       let meta = {};
       try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
-      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], localTags:meta.localTags||null, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
+      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
     });
     renderAll();
   } catch(e) {
@@ -650,14 +650,9 @@ function renderSidebar() {
   // Inbox: images tagged for current country but not yet locally tagged (approved)
   const inboxImages = currentCountry ? images.filter(i=>
     i.markets && i.markets.includes(currentCountry) &&
-    i.markets.length > 1 &&
-    !i.approvedMarkets?.includes(currentCountry) &&
-    !i.markets.filter(m=>m!==currentCountry).every(m=>false) // from another market
-  ).filter(i=> {
-    // Only show in inbox if the image was "sent" from another market (has tags from another market's taxonomy)
-    const otherMarkets = i.markets.filter(m=>m!==currentCountry);
-    return otherMarkets.length > 0 && !(i.localTags?.[currentCountry]);
-  }) : [];
+    i.uploadedBy !== currentCountry &&
+    !(i.localTags?.[currentCountry])
+  ) : [];
 
   let h='';
   if(inboxImages.length){
@@ -778,7 +773,9 @@ function selectProfile(p){mProfile=mProfile===p?null:p;renderProfileChips();}
 function renderProdAcc(){
   const acc=document.getElementById('prodAcc');
   if(!mCats.size){acc.innerHTML=`<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">${S.velgKat}</div>`;return;}
-  acc.innerHTML=[...mCats].map(cat=>`
+  const validCats=[...mCats].filter(cat=>TAXONOMY[cat]);
+  if(!validCats.length){acc.innerHTML=`<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">${S.velgKat}</div>`;return;}
+  acc.innerHTML=validCats.map(cat=>`
     <div class="prod-cat-hd">${cat}</div>
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
@@ -848,7 +845,7 @@ async function saveImage(){
   });
   const colors=[...new Set([...mProdColors.values()].filter(Boolean))];
   const prodColorPairs=[...mProds].map(p=>({prod:p,color:mProdColors.get(p)||null}));
-  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors,prodColorPairs,extras:[...mExtras],credit,profile:mProfile,markets};
+  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors,prodColorPairs,extras:[...mExtras],credit,profile:mProfile,markets,uploadedBy:currentCountry};
   let done=0;
   for(let file of pendingFiles){
     document.getElementById('progressStatus').textContent=`Laster opp ${done+1} av ${pendingFiles.length}: ${file.name}`;
@@ -916,7 +913,10 @@ function eSelectProfile(p){eProfile=eProfile===p?null:p;eRenderProfileChips();}
 function eRenderProdAcc(){
   const acc=document.getElementById('editProdAcc');
   if(!eCats.size){acc.innerHTML=`<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">${S.velgKat}</div>`;return;}
-  acc.innerHTML=[...eCats].map(cat=>`
+  // Only render cats that exist in current TAXONOMY
+  const validCats=[...eCats].filter(cat=>TAXONOMY[cat]);
+  if(!validCats.length){acc.innerHTML=`<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">${S.velgKat}</div>`;return;}
+  acc.innerHTML=validCats.map(cat=>`
     <div class="prod-cat-hd">${cat}</div>
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
@@ -978,7 +978,7 @@ function openInbox(){
   const countryNames={no:'Norge',se:'Sverige',dk:'Danmark'};
   const inboxImages=images.filter(i=>
     i.markets&&i.markets.includes(currentCountry)&&
-    i.markets.length>1&&
+    i.uploadedBy!==currentCountry&&
     !(i.localTags?.[currentCountry])
   );
   const grid=document.getElementById('inboxGrid');
