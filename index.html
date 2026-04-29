@@ -564,17 +564,27 @@ function setProdColor(p,c){
   renderProdAcc();
 }
 function toggleExtra(el,t){mExtras.has(t)?(mExtras.delete(t),el.classList.remove('selected')):(mExtras.add(t),el.classList.add('selected'));}
-function handleFiles(files){
-  pendingFiles=Array.from(files);
-  document.getElementById('filePrev').textContent=pendingFiles.length===1?pendingFiles[0].name:`${pendingFiles.length} filer valgt`;
+async function handleFiles(files){
+  const allFiles=Array.from(files);
+  pendingFiles=[];
   const wrap=document.getElementById('imgPreviewWrap');
-  wrap.innerHTML='';
-  pendingFiles.forEach(file=>{
+  wrap.innerHTML=''; wrap.classList.add('show');
+  document.getElementById('filePrev').textContent='Behandler filer…';
+
+  for(const file of allFiles){
+    const converted=/\.(tiff?)/i.test(file.name)?await convertToJpg(file,4000):file;
+    pendingFiles.push(converted);
     const reader=new FileReader();
-    reader.onload=e=>{const img=document.createElement('img');img.src=e.target.result;img.className='img-preview-thumb';img.title=file.name;wrap.appendChild(img);};
-    reader.readAsDataURL(file);
-  });
-  wrap.classList.add('show');
+    reader.onload=e=>{
+      const img=document.createElement('img');
+      img.src=e.target.result;
+      img.className='img-preview-thumb';
+      img.title=converted.name;
+      wrap.appendChild(img);
+    };
+    reader.readAsDataURL(converted);
+  }
+  document.getElementById('filePrev').textContent=pendingFiles.length===1?pendingFiles[0].name:`${pendingFiles.length} filer valgt`;
 }
 
 async function convertToJpg(file, maxPx=4000){
@@ -616,11 +626,6 @@ async function saveImage(){
   const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors,prodColorPairs,extras:[...mExtras],credit,profile:mProfile};
   let done=0;
   for(let file of pendingFiles){
-    // Convert .tif/.tiff to .jpg
-    if(/\.(tiff?)/i.test(file.name)){
-      showToast('Konverterer '+file.name+' til JPG…');
-      file=await convertToJpg(file,4000);
-    }
     const ext=file.name.match(/\.[^.]+$/)?.[0]||'';
     const slugParts=['Moelven',...prodColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))];
     const autoSlug=slugParts.join('-');
