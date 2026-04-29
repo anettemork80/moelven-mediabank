@@ -745,9 +745,15 @@ async function loadImages() {
   try {
     const q = encodeURIComponent(`'${FOLDER_ID}' in parents and mimeType contains 'image/' and trashed=false`);
     const fields = encodeURIComponent('files(id,name,description,thumbnailLink,createdTime,size)');
-    const data = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=createdTime desc`, {
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=createdTime desc`, {
       headers: { Authorization: 'Bearer ' + accessToken }
-    }).then(r => r.json());
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      console.error('Drive API error:', resp.status, data);
+      document.getElementById('grid').innerHTML = `<div class="empty"><p>Drive API feil ${resp.status}: ${data.error?.message||'Ukjent feil'}</p></div>`;
+      return;
+    }
     images = (data.files || []).map(f => {
       let meta = {};
       try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
@@ -755,7 +761,8 @@ async function loadImages() {
     });
     renderAll();
   } catch(e) {
-    document.getElementById('grid').innerHTML = '<div class="empty"><p>Kunne ikke laste bilder. Sjekk tilgang og prøv igjen.</p></div>';
+    console.error('loadImages exception:', e);
+    document.getElementById('grid').innerHTML = `<div class="empty"><p>Kunne ikke laste bilder: ${e.message}</p></div>`;
   }
 }
 
