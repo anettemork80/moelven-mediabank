@@ -1190,30 +1190,24 @@ async function saveEdit(){
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
 
   if(isFromOtherMarket){
-    // Store as local market metadata – only localMeta and localTags change
     if(!img.localMeta) img.localMeta={};
     img.localMeta[currentCountry]=localData;
     if(!img.localTags) img.localTags={};
     img.localTags[currentCountry]=true;
-    // metaToSave: keep ALL original img properties, just update localMeta and localTags
-    metaToSave={
-      title:img.title, categories:img.categories, products:img.products,
-      colors:img.colors, prodColorPairs:img.prodColorPairs, extras:img.extras,
-      credit:img.credit, profile:img.profile, markets:img.markets,
-      uploadedBy:img.uploadedBy, localTags:img.localTags, localMeta:img.localMeta
-    };
+    metaToSave=buildCleanMeta(img);
     newFileName=img.name;
   } else {
     newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
-    metaToSave={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:localData.credit,profile:eProfile,markets:getSelectedMarkets('editMarketChips'),uploadedBy:img.uploadedBy,localTags:img.localTags,localMeta:img.localMeta};
     img.title=newTitle; img.name=newFileName;
     img.categories=[...eCats]; img.products=[...eProds];
     img.colors=eColors; img.prodColorPairs=eProdColorPairs;
     img.extras=[...eExtras]; img.credit=localData.credit; img.profile=eProfile;
     img.markets=getSelectedMarkets('editMarketChips');
+    metaToSave=buildCleanMeta(img);
   }
 
   try{
+    console.log('[saveEdit] Saving to Drive:', JSON.stringify(metaToSave).length, 'chars', metaToSave);
     await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
@@ -1261,14 +1255,30 @@ function openInbox(){
   document.getElementById('inboxModal').classList.add('open');
 }
 
+function buildCleanMeta(img){
+  // Only save what's needed – avoid Drive description size limit
+  return {
+    title: img.title,
+    categories: img.categories||[],
+    products: img.products||[],
+    colors: img.colors||[],
+    prodColorPairs: img.prodColorPairs||[],
+    extras: img.extras||[],
+    credit: img.credit||'',
+    profile: img.profile||null,
+    markets: img.markets||['no'],
+    uploadedBy: img.uploadedBy||'no',
+    localTags: img.localTags||null,
+    localMeta: img.localMeta||{}
+  };
+}
+
 async function approveFromInbox(id, openEdit){
   const img=images.find(i=>i.id===id);
   if(!img) return;
-  // Mark as locally approved for this market
   if(!img.localTags) img.localTags={};
   img.localTags[currentCountry]=true;
-  // Save to Drive
-  const meta={...img};
+  const meta=buildCleanMeta(img);
   try{
     await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
       method:'PATCH',
@@ -1373,7 +1383,7 @@ async function rejectFromInbox(id){
     await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
       method:'PATCH',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({description:JSON.stringify({...img})})
+      body:JSON.stringify({description:JSON.stringify(buildCleanMeta(img))})
     });
     document.getElementById('inboxModal').classList.remove('open');
     renderAll();
