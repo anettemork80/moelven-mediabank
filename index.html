@@ -1194,7 +1194,11 @@ async function saveEdit(){
     img.localMeta[currentCountry]=localData;
     if(!img.localTags) img.localTags={};
     img.localTags[currentCountry]=true;
+    console.log('[saveEdit] localData:', JSON.stringify(localData));
+    console.log('[saveEdit] img.localMeta after set:', JSON.stringify(img.localMeta));
+    console.log('[saveEdit] isFromOtherMarket:', isFromOtherMarket, 'currentCountry:', currentCountry, 'uploadedBy:', img.uploadedBy);
     metaToSave=buildCleanMeta(img);
+    console.log('[saveEdit] metaToSave.localMeta:', JSON.stringify(metaToSave.localMeta));
     newFileName=img.name;
   } else {
     newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
