@@ -171,7 +171,8 @@
   .toast.show { opacity:1; }
   .edit-btn { position:absolute; bottom:7px; left:7px; background:rgba(255,255,255,0.9); border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-family:'Source Sans 3',sans-serif; color:var(--teal); font-weight:600; cursor:pointer; opacity:0; transition:opacity 0.15s; }
   .delete-btn { position:absolute; bottom:7px; left:72px; background:rgba(255,255,255,0.9); border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-family:'Source Sans 3',sans-serif; color:#c0392b; font-weight:600; cursor:pointer; opacity:0; transition:opacity 0.15s; }
-  .card:hover .edit-btn, .card:hover .delete-btn { opacity:1; }
+  .opti-btn { position:absolute; bottom:7px; right:7px; background:rgba(255,255,255,0.9); border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-family:'Source Sans 3',sans-serif; color:var(--orange); font-weight:600; cursor:pointer; opacity:0; transition:opacity 0.15s; }
+  .card:hover .edit-btn, .card:hover .delete-btn, .card:hover .opti-btn { opacity:1; }
   .inbox-reject-btn { background:white; color:#c0392b; border:1.5px solid #e0a0a0; border-radius:4px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Source Sans 3',sans-serif; }
 
   /* Optimizely formats */
@@ -447,7 +448,7 @@
     <p class="modal-sub" id="inboxModalSub">Disse bildene er delt fra andre markeder og venter på lokale tagger.</p>
     <div id="inboxGrid" class="inbox-modal-grid"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="document.getElementById('inboxModal').classList.remove('open')">${S.close}</button>
+      <button class="btn-cancel" id="inboxCloseBtn" onclick="document.getElementById('inboxModal').classList.remove('open')">Lukk</button>
     </div>
   </div>
 </div>
@@ -618,7 +619,8 @@ const TAXONOMIES = {
   se: {
     "Ytterpanel":{products:{"Målad ytterpanel":["Fritt färgval"],"Limträpanel":[],"Kärnfuru KulörOlja":["Fritt färgval"],"ThermoWood KulörOlja":["Fritt färgval"],"ThermoWood Råborstad":[],"Naturliga träfasader":[]}},
     "Trä utomhus":{products:{"Tryckimpregnerad furu trall":[],"ThermoWood trall":[],"TermoAsk trall":[],"Stolpar och räcken":[],"Staket":[],"Spiler":[]}},
-    "Trä inomhus":{products:{"Innerpanel Stilla":["Morgondis","Daggdis","Skogsbrun","Kolmörk"],"Innerpanel Pärlspont":[],"Panelskivor Regina":[],"Trägolv Leva":["Grå","Beige","Vit"],"Trägolv Arctic Furu":[],"Lister":[]}},
+    "Trä inomhus":{products:{"Innerpanel Stilla":["Gärdsgårdsgrå","Morgondis","Sandbeige","Skogsbrun"],"Innerpanel Attityd":[],"Innerpanel Effekt":[],"Innerpanel Trend":[],"Innerpanel Pärlspont":[],"Panelskivor Regina":[],"Trägolv Leva":["Grå","Beige","Vit"],"Trägolv Arctic Furu":[],"Lister":[]}},
+    "Golv":{products:{"Målade furugolv":[],"Hårdvaxoljade furugolv":[],"Hårdvaxoljade ekgolv":[]}},
     "Konstruktionsvirke":{products:{"Konstruktionsvirke":[],"Impregnerat konstruktionsvirke":[]}},
     "Plywood och skivor":{products:{"Vänerply":[],"OSB":[],"MDF":[]}}
   },
@@ -706,6 +708,7 @@ function applyStrings(){
 
   // Inbox modal
   set('inboxModalTitle',S.inboxTitle); set('inboxModalSub',S.inboxSub);
+  set('inboxCloseBtn',S.close);
 
   // Optimizely modal
   set('optiModalTitle',S.optiTitle);
@@ -812,7 +815,15 @@ async function uploadToDrive(file, meta, fileName) {
 function getImgMeta(img){
   if(currentCountry && img.uploadedBy !== currentCountry && img.localMeta?.[currentCountry]){
     const local=img.localMeta[currentCountry];
-    return {title:local.title||img.title,categories:local.categories||img.categories,products:local.products||img.products,colors:local.colors||img.colors,extras:local.extras||img.extras,credit:local.credit||img.credit,profile:local.profile||img.profile};
+    return {
+      title: local.title||img.title,
+      categories: local.categories!==undefined ? local.categories : img.categories,
+      products: local.products!==undefined ? local.products : img.products,
+      colors: local.colors!==undefined ? local.colors : img.colors,
+      extras: local.extras!==undefined ? local.extras : img.extras,
+      credit: local.credit!==undefined ? local.credit : img.credit,
+      profile: local.profile!==undefined ? local.profile : img.profile
+    };
   }
   return img;
 }
@@ -856,7 +867,8 @@ function renderGrid() {
   if(searchQ){const q=searchQ.toLowerCase();f=f.filter(i=>[i.title,...i.categories,...i.products,...i.colors,...i.extras].some(x=>x&&x.toLowerCase().includes(q)));}
   document.getElementById('breadcrumb').innerHTML=activeProd?`${activeCat} → <strong>${activeProd}</strong>`:activeCat?`<strong>${activeCat}</strong>`:'<strong>Alle bilder</strong>';
   document.getElementById('resultCount').textContent=`${f.length} bilde${f.length!==1?'r':''}`;
-  document.getElementById('statsText').textContent=`${images.length} bilder`;
+  const visibleCount=currentCountry?images.filter(i=>i.markets&&i.markets.includes(currentCountry)&&(i.uploadedBy===currentCountry||i.localTags?.[currentCountry]===true)).length:images.length;
+  document.getElementById('statsText').textContent=`${visibleCount} bilder`;
   const g=document.getElementById('grid');
   if(!f.length){
     let emptyMsg='';
@@ -892,7 +904,8 @@ function renderGrid() {
         <div class="card-check">✓</div>
         ${thumb?`<div class="zoom-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3.5" stroke="#473b33" stroke-width="1.2"/><path d="M8 8l2.5 2.5" stroke="#473b33" stroke-width="1.2" stroke-linecap="round"/></svg></div>`:''}
         <button class="edit-btn" onclick="event.stopPropagation();openEditModal('${img.id}')">${S.editBtn}</button>
-        <button class="delete-btn" onclick="event.stopPropagation();deleteImage('${img.id}')">${S.deleteBtn}</button>      </div>
+        <button class="delete-btn" onclick="event.stopPropagation();deleteImage('${img.id}')">${S.deleteBtn}</button>
+        <button class="opti-btn" onclick="event.stopPropagation();openOptiModal('${img.id}')">${S.optiBtn}</button>      </div>
       <div class="card-body">
         <div class="card-name">${m.title}</div>
         <div class="card-tags">
@@ -963,7 +976,7 @@ function renderProdAcc(){
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
         <div class="prod-chip ${mProds.has(p)?'selected':''}" style="width:100%;text-align:left;margin-bottom:${mProds.has(p)&&colors.length?'4px':'0'}" onclick="toggleProd('${p}','${cat}')">${p}</div>
-        ${mProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${mProdColors.get(p)===c?'selected':''}" onclick="setProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div id="cc_${p.replace(/\s+/g,'_')}" style="display:${mProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(mProdColors.get(p))&&mProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input free-color-input" data-prod="${p}" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(mProdColors.get(p)&&!colors.includes(mProdColors.get(p)))?mProdColors.get(p):''}" oninput="setProdColor('${p}',this.value,true)" onblur="renderProdAcc()"></div>`:''}</div>`:''}
+        ${mProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${mProdColors.get(p)===c?'selected':''}" onclick="setProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.some(c=>c==='Fritt fargevalg'||c==='Fritt färgval')?`<div id="cc_${p.replace(/\s+/g,'_')}" style="display:${colors.some(c=>(c==='Fritt fargevalg'||c==='Fritt färgval')&&mProdColors.get(p)===c)||(!colors.includes(mProdColors.get(p))&&mProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input free-color-input" data-prod="${p}" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(mProdColors.get(p)&&!colors.includes(mProdColors.get(p)))?mProdColors.get(p):''}" oninput="setProdColor('${p}',this.value,true)" onblur="renderProdAcc()"></div>`:''}</div>`:''}
       </div>`).join('')}
     </div>`).join('');
 }
@@ -1099,7 +1112,7 @@ function openEditModal(id){
   eProdColors=new Map();
   if(src.prodColorPairs){src.prodColorPairs.forEach(({prod,color})=>{if(color)eProdColors.set(prod,color);});}
   else if(src.colors&&src.colors.length){[...eProds].forEach(p=>{const cats=[...eCats];for(const cat of cats){const cs=TAXONOMY[cat]?.products[p];if(cs&&cs.length){const match=src.colors.find(c=>cs.includes(c));if(match)eProdColors.set(p,match);}}})}
-  eExtras=new Set(src.extras||[]);
+  eExtras=new Set((src.extras||[]).map(e=>e.trim()));
   document.getElementById('editTitle').value=src.title||'';
   document.getElementById('editCredit').value=src.credit||'';
   eProfile=src.profile||null;
@@ -1140,7 +1153,7 @@ function eRenderProdAcc(){
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
         <div class="prod-chip ${eProds.has(p)?'selected':''}" style="width:100%;text-align:left;margin-bottom:${eProds.has(p)&&colors.length?'4px':'0'}" onclick="eToggleProd('${p}','${cat}')">${p}</div>
-        ${eProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${eProdColors.get(p)===c?'selected':''}" onclick="eSetProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div style="display:${eProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(eProdColors.get(p))&&eProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input free-color-input" data-prod="${p}" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(eProdColors.get(p)&&!colors.includes(eProdColors.get(p)))?eProdColors.get(p):''}" oninput="eSetProdColor('${p}',this.value,true)" onblur="eRenderProdAcc()"></div>`:''}</div>`:''}
+        ${eProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${eProdColors.get(p)===c?'selected':''}" onclick="eSetProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.some(c=>c==='Fritt fargevalg'||c==='Fritt färgval')?`<div style="display:${colors.some(c=>(c==='Fritt fargevalg'||c==='Fritt färgval')&&eProdColors.get(p)===c)||(!colors.includes(eProdColors.get(p))&&eProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input free-color-input" data-prod="${p}" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(eProdColors.get(p)&&!colors.includes(eProdColors.get(p)))?eProdColors.get(p):''}" oninput="eSetProdColor('${p}',this.value,true)" onblur="eRenderProdAcc()"></div>`:''}</div>`:''}
       </div>`).join('')}
     </div>`).join('');
 }
