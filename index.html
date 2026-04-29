@@ -611,6 +611,16 @@ async function saveImage(){
   document.getElementById('progressFill').style.width='0%';
   document.getElementById('progressStatus').style.display='block';
   const credit=document.getElementById('imgCredit').value.trim();
+  // Flush any free-text color inputs not yet stored via onblur
+  document.querySelectorAll('#prodAcc input.form-input').forEach(input=>{
+    if(input.value.trim()){
+      for(const p of mProds){
+        if(input.getAttribute('oninput')&&input.getAttribute('oninput').includes(`'${p}'`)){
+          mProdColors.set(p,input.value.trim());
+        }
+      }
+    }
+  });
   const colors=[...new Set([...mProdColors.values()].filter(Boolean))];
   const prodColorPairs=[...mProds].map(p=>({prod:p,color:mProdColors.get(p)||null}));
   const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors,prodColorPairs,extras:[...mExtras],credit,profile:mProfile};
@@ -693,6 +703,16 @@ async function saveEdit(){
   saveBtn.disabled=true; cancelBtn.disabled=true; saveBtn.textContent='Lagrer…';
   const img=images.find(i=>i.id===editId);
   const typedTitle=document.getElementById('editTitle').value.trim();
+  // Flush any free-text color inputs not yet stored via onblur
+  document.querySelectorAll('#editProdAcc input.form-input').forEach(input=>{
+    if(input.value.trim()){
+      for(const p of eProds){
+        if(input.getAttribute('oninput')&&input.getAttribute('oninput').includes(`'${p}'`)){
+          eProdColors.set(p,input.value.trim());
+        }
+      }
+    }
+  });
   const eProdColorPairs=[...eProds].map(p=>({prod:p,color:eProdColors.get(p)||null}));
   const eColors=[...new Set(eProdColorPairs.map(({color})=>color).filter(Boolean))];
   const autoTitle=['Moelven',...eProdColorPairs.map(({prod,color})=>prod+(color?' '+color:''))].join(' ');
