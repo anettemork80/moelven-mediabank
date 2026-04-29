@@ -1205,12 +1205,13 @@ async function saveEdit(){
     metaToSave=buildCleanMeta(img);
   }
 
-  try{    const patchResp=await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
+  try{
+    await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
       body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
     });
-    const patchData=await patchResp.json();    if(!patchResp.ok)    closeEditModal();
+    closeEditModal();
     renderAll();
     showToast(S.savedOk);
   } catch(e){ showToast(S.saveError); }
