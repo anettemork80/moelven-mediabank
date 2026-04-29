@@ -554,7 +554,7 @@ function renderProdAcc(){
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
         <div class="prod-chip ${mProds.has(p)?'selected':''}" style="width:100%;text-align:left;margin-bottom:${mProds.has(p)&&colors.length?'4px':'0'}" onclick="toggleProd('${p}','${cat}')">${p}</div>
-        ${mProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${mProdColors.get(p)===c?'selected':''}" onclick="setProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div id="cc_${p.replace(/\s+/g,'_')}" style="display:${mProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(mProdColors.get(p))&&mProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(mProdColors.get(p)&&!colors.includes(mProdColors.get(p)))?mProdColors.get(p):''}" oninput="setProdColor('${p}',this.value)"></div>`:''}</div>`:''}
+        ${mProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${mProdColors.get(p)===c?'selected':''}" onclick="setProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div id="cc_${p.replace(/\s+/g,'_')}" style="display:${mProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(mProdColors.get(p))&&mProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(mProdColors.get(p)&&!colors.includes(mProdColors.get(p)))?mProdColors.get(p):''}" oninput="setProdColor('${p}',this.value,true)" onblur="renderProdAcc()"></div>`:''}</div>`:''}
       </div>`).join('')}
     </div>`).join('');
 }
@@ -563,9 +563,9 @@ function toggleProd(p,cat){
   else{mProds.add(p);}
   renderProdAcc();
 }
-function setProdColor(p,c){
+function setProdColor(p,c,skipRender=false){
   mProdColors.set(p,c);
-  renderProdAcc();
+  if(!skipRender) renderProdAcc();
 }
 function toggleExtra(el,t){mExtras.has(t)?(mExtras.delete(t),el.classList.remove('selected')):(mExtras.add(t),el.classList.add('selected'));}
 async function handleFiles(files){
@@ -678,12 +678,12 @@ function eRenderProdAcc(){
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
         <div class="prod-chip ${eProds.has(p)?'selected':''}" style="width:100%;text-align:left;margin-bottom:${eProds.has(p)&&colors.length?'4px':'0'}" onclick="eToggleProd('${p}','${cat}')">${p}</div>
-        ${eProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${eProdColors.get(p)===c?'selected':''}" onclick="eSetProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div style="display:${eProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(eProdColors.get(p))&&eProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(eProdColors.get(p)&&!colors.includes(eProdColors.get(p)))?eProdColors.get(p):''}" oninput="eSetProdColor('${p}',this.value)"></div>`:''}</div>`:''}
+        ${eProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${eProdColors.get(p)===c?'selected':''}" onclick="eSetProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div style="display:${eProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(eProdColors.get(p))&&eProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(eProdColors.get(p)&&!colors.includes(eProdColors.get(p)))?eProdColors.get(p):''}" oninput="eSetProdColor('${p}',this.value,true)" onblur="eRenderProdAcc()"></div>`:''}</div>`:''}
       </div>`).join('')}
     </div>`).join('');
 }
 function eToggleProd(p){if(eProds.has(p)){eProds.delete(p);eProdColors.delete(p);}else{eProds.add(p);}eRenderProdAcc();}
-function eSetProdColor(p,c){eProdColors.set(p,c);eRenderProdAcc();}
+function eSetProdColor(p,c,skipRender=false){eProdColors.set(p,c);if(!skipRender)eRenderProdAcc();}
 function eRenderExtraTags(){document.getElementById('editExtraTags').innerHTML=EXTRA_TAGS.map(t=>`<div class="e-chip ${eExtras.has(t)?'selected':''}" onclick="eToggleExtra(this,'${t}')">${t}</div>`).join('');}
 function eToggleExtra(el,t){eExtras.has(t)?(eExtras.delete(t),el.classList.remove('selected')):(eExtras.add(t),el.classList.add('selected'));}
 
