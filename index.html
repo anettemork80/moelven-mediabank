@@ -554,7 +554,7 @@ function renderProdAcc(){
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
         <div class="prod-chip ${mProds.has(p)?'selected':''}" style="width:100%;text-align:left;margin-bottom:${mProds.has(p)&&colors.length?'4px':'0'}" onclick="toggleProd('${p}','${cat}')">${p}</div>
-        ${mProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${mProdColors.get(p)===c?'selected':''}" onclick="setProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div id="cc_${p.replace(/\s+/g,'_')}" style="display:${mProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(mProdColors.get(p))&&mProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(mProdColors.get(p)&&!colors.includes(mProdColors.get(p)))?mProdColors.get(p):''}" oninput="setProdColor('${p}',this.value,true)" onblur="renderProdAcc()"></div>`:''}</div>`:''}
+        ${mProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${mProdColors.get(p)===c?'selected':''}" onclick="setProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div id="cc_${p.replace(/\s+/g,'_')}" style="display:${mProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(mProdColors.get(p))&&mProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input free-color-input" data-prod="${p}" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(mProdColors.get(p)&&!colors.includes(mProdColors.get(p)))?mProdColors.get(p):''}" oninput="setProdColor('${p}',this.value,true)" onblur="renderProdAcc()"></div>`:''}</div>`:''}
       </div>`).join('')}
     </div>`).join('');
 }
@@ -612,14 +612,9 @@ async function saveImage(){
   document.getElementById('progressStatus').style.display='block';
   const credit=document.getElementById('imgCredit').value.trim();
   // Flush any free-text color inputs not yet stored via onblur
-  document.querySelectorAll('#prodAcc input.form-input').forEach(input=>{
-    if(input.value.trim()){
-      for(const p of mProds){
-        if(input.getAttribute('oninput')&&input.getAttribute('oninput').includes(`'${p}'`)){
-          mProdColors.set(p,input.value.trim());
-        }
-      }
-    }
+  document.querySelectorAll('#prodAcc input.free-color-input').forEach(input=>{
+    const prod=input.getAttribute('data-prod');
+    if(prod&&input.value.trim()) mProdColors.set(prod, input.value.trim());
   });
   const colors=[...new Set([...mProdColors.values()].filter(Boolean))];
   const prodColorPairs=[...mProds].map(p=>({prod:p,color:mProdColors.get(p)||null}));
@@ -688,7 +683,7 @@ function eRenderProdAcc(){
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
       <div style="grid-column:1/-1;">
         <div class="prod-chip ${eProds.has(p)?'selected':''}" style="width:100%;text-align:left;margin-bottom:${eProds.has(p)&&colors.length?'4px':'0'}" onclick="eToggleProd('${p}','${cat}')">${p}</div>
-        ${eProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${eProdColors.get(p)===c?'selected':''}" onclick="eSetProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div style="display:${eProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(eProdColors.get(p))&&eProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(eProdColors.get(p)&&!colors.includes(eProdColors.get(p)))?eProdColors.get(p):''}" oninput="eSetProdColor('${p}',this.value,true)" onblur="eRenderProdAcc()"></div>`:''}</div>`:''}
+        ${eProds.has(p)&&colors.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px 8px;">${colors.map(c=>`<div class="c-chip ${eProdColors.get(p)===c?'selected':''}" onclick="eSetProdColor('${p}','${c}')">${c}</div>`).join('')}${colors.includes('Fritt fargevalg')?`<div style="display:${eProdColors.get(p)==='Fritt fargevalg'||(!colors.includes(eProdColors.get(p))&&eProdColors.get(p))?'block':'none'};margin-top:4px;width:100%;"><input class="form-input free-color-input" data-prod="${p}" style="font-size:13px;padding:6px 10px;" placeholder="Fargekode, f.eks. Jotun 1234" value="${(eProdColors.get(p)&&!colors.includes(eProdColors.get(p)))?eProdColors.get(p):''}" oninput="eSetProdColor('${p}',this.value,true)" onblur="eRenderProdAcc()"></div>`:''}</div>`:''}
       </div>`).join('')}
     </div>`).join('');
 }
@@ -704,14 +699,9 @@ async function saveEdit(){
   const img=images.find(i=>i.id===editId);
   const typedTitle=document.getElementById('editTitle').value.trim();
   // Flush any free-text color inputs not yet stored via onblur
-  document.querySelectorAll('#editProdAcc input.form-input').forEach(input=>{
-    if(input.value.trim()){
-      for(const p of eProds){
-        if(input.getAttribute('oninput')&&input.getAttribute('oninput').includes(`'${p}'`)){
-          eProdColors.set(p,input.value.trim());
-        }
-      }
-    }
+  document.querySelectorAll('#editProdAcc input.free-color-input').forEach(input=>{
+    const prod=input.getAttribute('data-prod');
+    if(prod&&input.value.trim()) eProdColors.set(prod, input.value.trim());
   });
   const eProdColorPairs=[...eProds].map(p=>({prod:p,color:eProdColors.get(p)||null}));
   const eColors=[...new Set(eProdColorPairs.map(({color})=>color).filter(Boolean))];
