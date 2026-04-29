@@ -629,8 +629,11 @@ async function saveImage(){
     const autoTitle=titleParts.join(' ');
     const usedTitle=meta.title||autoTitle;
     const autoFileName=autoSlug+ext;
-    const fm={...meta,title:usedTitle};
-    try{const res=await uploadToDrive(file,fm,autoFileName);images.unshift({id:res.id,name:autoFileName,...fm,thumbnailLink:res.thumbnailLink});}
+    const fm={...meta,title:usedTitle,prodColorPairs};
+    try{
+      const res=await uploadToDrive(file,fm,autoFileName);
+      images.unshift({id:res.id,name:autoFileName,...fm,title:usedTitle,thumbnailLink:res.thumbnailLink});
+    }
     catch(e){showToast('Feil: '+file.name);}
     done++;document.getElementById('progressFill').style.width=Math.round(done/pendingFiles.length*100)+'%';
   }
