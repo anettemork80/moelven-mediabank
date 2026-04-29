@@ -374,13 +374,19 @@
       <input type="text" class="form-input" id="imgCredit" placeholder="F.eks. Johansen Foto AS">
     </div>
     <div class="form-group">
-      <label class="opti-toggle" onclick="toggleOptiSection()">
-        <input type="checkbox" id="optiToggle" onclick="event.stopPropagation();toggleOptiSection()">
+      <div class="opti-toggle" onclick="toggleOptiSection()">
+        <input type="checkbox" id="optiToggle" onclick="event.stopPropagation();document.getElementById('optiFormats').classList.toggle('show',this.checked);if(this.checked&&!document.getElementById('optiFormatGrid').children.length)renderOptiFormats();">
         <span class="opti-toggle-label">Generer Optimizely-formater</span>
-        <span style="font-size:12px;color:rgba(12,76,81,0.6);font-weight:400;margin-left:auto;">Beskjærer og skalerer bildet automatisk</span>
-      </label>
+        <span style="font-size:12px;color:rgba(12,76,81,0.6);font-weight:400;margin-left:auto;" id="optiGenSubText">Beskjærer og skalerer bildet automatisk</span>
+      </div>
       <div class="opti-formats" id="optiFormats">
-        <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Velg formatene du vil generere:</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:12px;color:var(--text-light)" id="optiFormatsLabelEl">Velg formatene du vil generere:</div>
+          <div style="display:flex;gap:10px;">
+            <a onclick="selectAllOptiFormats(true)" style="font-size:12px;color:var(--teal);cursor:pointer;font-weight:600;">Velg alle</a>
+            <a onclick="selectAllOptiFormats(false)" style="font-size:12px;color:var(--text-light);cursor:pointer;">Fjern alle</a>
+          </div>
+        </div>
         <div class="opti-formats-grid" id="optiFormatGrid"></div>
       </div>
     </div>
@@ -500,11 +506,18 @@ const OPTI_FORMATS = [
 function toggleOptiSection(){
   const cb=document.getElementById('optiToggle');
   const wrap=document.getElementById('optiFormats');
+  // cb.checked is already toggled by the checkbox input itself when clicking the checkbox
+  // When clicking the div, we manually toggle
+  if(event&&event.target===cb) return; // checkbox handles its own state
   cb.checked=!cb.checked;
   wrap.classList.toggle('show',cb.checked);
   if(cb.checked && !document.getElementById('optiFormatGrid').children.length){
     renderOptiFormats();
   }
+}
+
+function selectAllOptiFormats(select){
+  document.querySelectorAll('.opti-fmt-cb').forEach(cb=>cb.checked=select);
 }
 
 function renderOptiFormats(){
@@ -678,7 +691,8 @@ function applyStrings(){
   set('labelProfile',S.profileLabel); set('labelType',S.typeLabel);
   setFirst('labelMarket',S.marketLabel); setFirst('labelCredit',S.creditLabel);
   const otl=document.querySelector('.opti-toggle-label');if(otl)otl.textContent=S.optiGenTitle;
-  const ofl=document.querySelector('#optiFormats>div');if(ofl)ofl.textContent=S.optiFormatsLabel;
+  const ofl=document.getElementById('optiFormatsLabelEl');if(ofl)ofl.textContent=S.optiFormatsLabel;
+  const ogs=document.getElementById('optiGenSubText');if(ogs)ogs.textContent=S.optiGenSub;
   const sb=document.getElementById('saveBtn');if(sb)sb.textContent=S.saveBtn;
   const cb=document.getElementById('cancelBtn');if(cb)cb.textContent=S.cancel;
 
