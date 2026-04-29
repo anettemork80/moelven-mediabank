@@ -794,7 +794,7 @@ async function loadImages() {
     images = (data.files || []).map(f => {
       let meta = {};
       try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
-      if(meta.localMeta && Object.keys(meta.localMeta).length)      else if(meta.markets && meta.markets.length > 1)      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, localMeta:meta.localMeta||{}, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
+      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, localMeta:meta.localMeta||{}, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
     });
     renderAll();
   } catch(e) {
@@ -1205,13 +1205,12 @@ async function saveEdit(){
     metaToSave=buildCleanMeta(img);
   }
 
-  try{
-    await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
+  try{    const patchResp=await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
       body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
     });
-    closeEditModal();
+    const patchData=await patchResp.json();    if(!patchResp.ok)    closeEditModal();
     renderAll();
     showToast(S.savedOk);
   } catch(e){ showToast(S.saveError); }
