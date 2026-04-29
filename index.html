@@ -485,8 +485,7 @@
 <script>
 const CLIENT_ID = '97591089619-ov8t3bcs7kh98pnuq8sk1pmvanh90f09.apps.googleusercontent.com';
 const FOLDER_ID = '1zbcjB56XcCgeJKgwsW0KECME-tKkMgjy';
-let inboxImages = []; // separate array for inbox items
-let inboxFolderCache = {}; // cache inbox folder IDs per country
+
 const SCOPES = 'https://www.googleapis.com/auth/drive';
 
 const OPTI_FORMATS = [
@@ -596,7 +595,7 @@ async function getOrCreateOptiFolder(baseName){
   });
   return (await cr2.json()).id;
 }
-let accessToken=null, images=[], activeCat=null, activeProd=null, searchQ='';
+let accessToken=null, images=[], inboxImages=[], activeCat=null, activeProd=null, searchQ='';
 let selected=new Set(), pendingFiles=[];
 let mCats=new Set(), mProds=new Set(), mProdColors=new Map(), mExtras=new Set(), mProfile=null;
 let currentCountry = localStorage.getItem('moelven_country') || null;
@@ -782,7 +781,10 @@ async function getUserInfo() {
 function parseImageFile(f){
   let meta={};
   try{meta=JSON.parse(f.description||'{}');}catch(e){}
-  return {id:f.id,name:f.name,title:meta.title||f.name.replace(/\.[^.]+$/,''),categories:meta.categories||[],products:meta.products||[],colors:meta.colors||[],prodColorPairs:meta.prodColorPairs||[],extras:meta.extras||[],credit:meta.credit||'',profile:meta.profile||null,markets:meta.markets||[currentCountry||'no'],uploadedBy:meta.uploadedBy||currentCountry||'no',sourceId:meta.sourceId||null,thumbnailLink:f.thumbnailLink,fileSize:f.size?parseInt(f.size):null};
+  const uploadedBy=meta.uploadedBy||currentCountry||'no';
+  // Legacy files without approved: treat as approved for their uploadedBy country
+  const approved=meta.approved||(meta.uploadedBy?[meta.uploadedBy]:[uploadedBy]);
+  return {id:f.id,name:f.name,title:meta.title||f.name.replace(/\.[^.]+$/,''),categories:meta.categories||[],products:meta.products||[],colors:meta.colors||[],prodColorPairs:meta.prodColorPairs||[],extras:meta.extras||[],credit:meta.credit||'',profile:meta.profile||null,markets:meta.markets||[uploadedBy],uploadedBy,approved,thumbnailLink:f.thumbnailLink,fileSize:f.size?parseInt(f.size):null};
 }
 
 async function loadImages() {
@@ -799,54 +801,17 @@ async function loadImages() {
       document.getElementById('grid').innerHTML = `<div class="empty"><p>Drive API feil ${resp.status}: ${data.error?.message||'Ukjent feil'}</p></div>`;
       return;
     }
-    images = (data.files||[]).map(parseImageFile);
-    await loadInbox();
+    const allFiles = (data.files||[]).map(parseImageFile);
+    // Images approved for current market go to main bank; others targeting this market go to inbox
+    images = allFiles.filter(img => img.approved.includes(currentCountry));
+    inboxImages = allFiles.filter(img => !img.approved.includes(currentCountry) && img.markets.includes(currentCountry));
     renderAll();
   } catch(e) {
     document.getElementById('grid').innerHTML = `<div class="empty"><p>Kunne ikke laste bilder: ${e.message}</p></div>`;
   }
 }
 
-async function getOrCreateInboxFolder(country){
-  if(inboxFolderCache[country]) return inboxFolderCache[country];
-  // Find or create Inbox parent folder
-  let inboxParentId;
-  const q1=encodeURIComponent(`'${FOLDER_ID}' in parents and name='Inbox' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const r1=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q1}&fields=files(id)`,{headers:{Authorization:'Bearer '+accessToken}});
-  const d1=await r1.json();
-  if(d1.files&&d1.files.length){
-    inboxParentId=d1.files[0].id;
-  } else {
-    const cr=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({name:'Inbox',mimeType:'application/vnd.google-apps.folder',parents:[FOLDER_ID]})});
-    inboxParentId=(await cr.json()).id;
-  }
-  // Find or create country subfolder
-  const q2=encodeURIComponent(`'${inboxParentId}' in parents and name='${country}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const r2=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q2}&fields=files(id)`,{headers:{Authorization:'Bearer '+accessToken}});
-  const d2=await r2.json();
-  let folderId;
-  if(d2.files&&d2.files.length){
-    folderId=d2.files[0].id;
-  } else {
-    const cr2=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({name:country,mimeType:'application/vnd.google-apps.folder',parents:[inboxParentId]})});
-    folderId=(await cr2.json()).id;
-  }
-  inboxFolderCache[country]=folderId;
-  return folderId;
-}
-
-async function loadInbox(){
-  if(!currentCountry){inboxImages=[];return;}
-  try{
-    const folderId=await getOrCreateInboxFolder(currentCountry);
-    const q=encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed=false`);
-    const fields=encodeURIComponent('files(id,name,description,thumbnailLink,createdTime,size)');
-    const resp=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=createdTime desc`,{headers:{Authorization:'Bearer '+accessToken}});
-    const data=await resp.json();
-    // Only show images uploaded by other countries (not own market)
-    inboxImages=(data.files||[]).map(parseImageFile).filter(img=>img.uploadedBy&&img.uploadedBy!==currentCountry);
-  }catch(e){inboxImages=[];}
-}
+// Inbox is now derived from images metadata (approved field) — no Drive folder needed
 
 async function uploadToDrive(file, meta, fileName) {
   const form = new FormData();
@@ -1052,7 +1017,7 @@ async function saveImage(){
   });
   const colors=[...new Set([...mProdColors.values()].filter(Boolean))];
   const prodColorPairs=[...mProds].map(p=>({prod:p,color:mProdColors.get(p)||null}));
-  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors,prodColorPairs,extras:[...mExtras],credit,profile:mProfile,markets,uploadedBy:currentCountry};
+  const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors,prodColorPairs,extras:[...mExtras],credit,profile:mProfile,markets,uploadedBy:currentCountry,approved:[currentCountry]};
   let done=0;
   for(let file of pendingFiles){
     document.getElementById('progressStatus').textContent=`${S.uploadingN} ${done+1} ${S.ofN} ${pendingFiles.length}: ${file.name}`;
@@ -1067,17 +1032,6 @@ async function saveImage(){
     try{
       const res=await uploadToDrive(file,fm,autoFileName);
       images.unshift({id:res.id,name:autoFileName,...fm,title:usedTitle,thumbnailLink:res.thumbnailLink});
-      // Create inbox copies for other markets (markets selected in the form, excluding uploader's own country)
-      const otherMarkets=(markets||[]).filter(m=>m&&m!==currentCountry);
-      for(const otherMarket of otherMarkets){
-        document.getElementById('progressStatus').textContent=`Sender til ${otherMarket.toUpperCase()}-innboks…`;
-        const inboxFolderId=await getOrCreateInboxFolder(otherMarket);
-        const inboxMeta={...fm,title:usedTitle,sourceId:res.id,uploadedBy:currentCountry};
-        const inboxForm=new FormData();
-        inboxForm.append('metadata',new Blob([JSON.stringify({name:autoFileName,parents:[inboxFolderId],description:JSON.stringify(inboxMeta)})],{type:'application/json'}));
-        inboxForm.append('file',file);
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:'Bearer '+accessToken},body:inboxForm});
-      }
     }
     catch(e){showToast('Feil: '+file.name);}
     done++;document.getElementById('progressFill').style.width=Math.round(done/pendingFiles.length*100)+'%';
@@ -1201,22 +1155,23 @@ async function saveEdit(){
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
   const newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
   const newMarkets=getSelectedMarkets('editMarketChips');
-  const metaToSave={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile,markets:newMarkets,uploadedBy:img.uploadedBy||currentCountry,sourceId:img.sourceId||null};
+  const metaToSave={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile,markets:newMarkets,uploadedBy:img.uploadedBy||currentCountry,approved:img.approved||[currentCountry]};
   try{
     const isInboxImage = inboxImages.some(i=>i.id===editId);
     if(isInboxImage){
-      // Move from inbox to main folder with new name and Swedish tags
-      const inboxFolderId=await getOrCreateInboxFolder(currentCountry);
-      await fetch(`https://www.googleapis.com/drive/v3/files/${editId}?addParents=${FOLDER_ID}&removeParents=${inboxFolderId}`,{
+      // Approve for current market by adding currentCountry to approved array
+      const newApproved=[...new Set([...(img.approved||[]),currentCountry])];
+      const metaWithApproval={...metaToSave,approved:newApproved};
+      await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
         method:'PATCH',
         headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-        body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
+        body:JSON.stringify({name:newFileName,description:JSON.stringify(metaWithApproval)})
       });
       img.name=newFileName; img.title=newTitle;
       img.categories=[...eCats]; img.products=[...eProds];
       img.colors=eColors; img.prodColorPairs=eProdColorPairs;
       img.extras=[...eExtras]; img.credit=metaToSave.credit; img.profile=eProfile;
-      img.markets=newMarkets;
+      img.markets=newMarkets; img.approved=newApproved;
       images.unshift(img);
       inboxImages=inboxImages.filter(i=>i.id!==editId);
     } else {
@@ -1276,8 +1231,12 @@ async function approveFromInbox(id){
 
 async function rejectFromInbox(id){
   if(!confirm(S.inboxRejectConfirm)) return;
+  const img=inboxImages.find(i=>i.id===id);
+  if(!img) return;
   try{
-    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+accessToken}});
+    const newMarkets=(img.markets||[]).filter(m=>m!==currentCountry);
+    const updatedMeta={title:img.title,categories:img.categories,products:img.products,colors:img.colors,prodColorPairs:img.prodColorPairs,extras:img.extras,credit:img.credit,profile:img.profile,markets:newMarkets,uploadedBy:img.uploadedBy,approved:img.approved||[]};
+    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{method:'PATCH',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({description:JSON.stringify(updatedMeta)})});
     inboxImages=inboxImages.filter(i=>i.id!==id);
     document.getElementById('inboxModal').classList.remove('open');
     renderAll();
