@@ -709,7 +709,9 @@ async function saveEdit(){
   const eProdColorPairs=[...eProds].map(p=>({prod:p,color:eProdColors.get(p)||null}));
   const eColors=[...new Set(eProdColorPairs.map(({color})=>color).filter(Boolean))];
   const autoTitle=['Moelven',...eProdColorPairs.map(({prod,color})=>prod+(color?' '+color:''))].join(' ');
-  const newTitle=typedTitle||autoTitle;
+  // Only use typed title if user manually changed it (different from original)
+  const userChangedTitle = typedTitle && typedTitle !== img.title;
+  const newTitle=userChangedTitle?typedTitle:autoTitle;
   const meta={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile};
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
   const newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
