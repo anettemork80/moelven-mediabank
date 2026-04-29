@@ -141,8 +141,9 @@
   .img-preview-thumb { width:140px; height:140px; object-fit:cover; border-radius:6px; border:1.5px solid var(--border); cursor:zoom-in; }
   .img-preview-thumb:hover { border-color:var(--teal); }
   .file-prev { margin-top:6px; color:var(--teal-light); font-size:14.4px; font-weight:500; }
-  .progress-bar { width:100%; height:4px; background:var(--border); border-radius:2px; margin-top:10px; display:none; }
-  .progress-fill { height:100%; background:var(--teal); border-radius:2px; transition:width 0.3s; }
+  .progress-bar { width:100%; height:6px; background:var(--border); border-radius:3px; margin-top:10px; display:none; }
+  .progress-fill { height:100%; background:var(--teal); border-radius:3px; transition:width 0.25s; }
+  .progress-status { font-size:12.5px; color:var(--text-light); margin-top:6px; display:none; text-align:center; }
   .prod-acc { border:1.5px solid var(--border); border-radius:7px; overflow:hidden; }
   .prod-cat-hd { padding:8px 12px; background:var(--bg-blush); font-size:14.4px; font-weight:600; color:var(--dark-brown); border-bottom:1px solid var(--border); }
   .prod-items { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:7px; }
@@ -240,6 +241,7 @@
       <input type="file" id="fileInput" accept="image/*,.tif,.tiff" multiple style="display:none" onchange="handleFiles(this.files)">
       <div class="img-preview-wrap" id="imgPreviewWrap"></div>
       <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-status" id="progressStatus"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Bildetittel <em>— genereres automatisk hvis du ikke fyller inn</em></label>
@@ -527,6 +529,8 @@ function openModal(){
   document.querySelectorAll('.e-chip').forEach(e=>e.classList.remove('selected'));
   document.getElementById('progressBar').style.display='none';
   document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressStatus').style.display='none';
+  document.getElementById('progressStatus').textContent='';
   pendingFiles=[];
   document.getElementById('catCbs').innerHTML=Object.keys(TAXONOMY).map(cat=>`<div class="cat-cb" id="cb_${cat.replace(/\s+/g,'_')}" onclick="toggleCat('${cat}')"><div class="cat-cb-box"><div class="cat-cb-check"></div></div>${cat}</div>`).join('');
   renderProdAcc();renderProfileChips();document.getElementById('modal').classList.add('open');
@@ -568,12 +572,24 @@ async function handleFiles(files){
   const allFiles=Array.from(files);
   pendingFiles=[];
   const wrap=document.getElementById('imgPreviewWrap');
+  const bar=document.getElementById('progressBar');
+  const fill=document.getElementById('progressFill');
+  const status=document.getElementById('progressStatus');
   wrap.innerHTML=''; wrap.classList.add('show');
-  document.getElementById('filePrev').textContent='Behandler filer…';
 
-  for(const file of allFiles){
-    const converted=/\.(tiff?)/i.test(file.name)?await convertToJpg(file,4000):file;
+  const hasTif=allFiles.some(f=>/\.(tiff?)/i.test(f.name));
+  if(hasTif){
+    bar.style.display='block'; fill.style.width='0%';
+    status.style.display='block';
+  }
+
+  for(let i=0;i<allFiles.length;i++){
+    const file=allFiles[i];
+    const isTif=/\.(tiff?)/i.test(file.name);
+    if(hasTif) status.textContent=isTif?`Konverterer ${file.name} (${i+1} av ${allFiles.length})…`:`Behandler ${file.name} (${i+1} av ${allFiles.length})…`;
+    const converted=isTif?await convertToJpg(file,4000):file;
     pendingFiles.push(converted);
+    if(hasTif) fill.style.width=Math.round((i+1)/allFiles.length*100)+'%';
     const reader=new FileReader();
     reader.onload=e=>{
       const img=document.createElement('img');
@@ -585,6 +601,10 @@ async function handleFiles(files){
     reader.readAsDataURL(converted);
   }
   document.getElementById('filePrev').textContent=pendingFiles.length===1?pendingFiles[0].name:`${pendingFiles.length} filer valgt`;
+  if(hasTif){
+    status.textContent='Konvertering fullført ✓';
+    setTimeout(()=>{bar.style.display='none';fill.style.width='0%';status.style.display='none';},2000);
+  }
 }
 
 async function convertToJpg(file, maxPx=4000){
@@ -619,13 +639,15 @@ async function saveImage(){
   const saveBtn=document.getElementById('saveBtn'),cancelBtn=document.getElementById('cancelBtn');
   saveBtn.disabled=true;cancelBtn.disabled=true;saveBtn.textContent='Laster opp…';
   document.getElementById('progressBar').style.display='block';
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressStatus').style.display='block';
   const credit=document.getElementById('imgCredit').value.trim();
-  // Build colors array from per-product color map
   const colors=[...new Set([...mProdColors.values()].filter(Boolean))];
   const prodColorPairs=[...mProds].map(p=>({prod:p,color:mProdColors.get(p)||null}));
   const meta={title:document.getElementById('imgTitle').value.trim(),categories:[...mCats],products:[...mProds],colors,prodColorPairs,extras:[...mExtras],credit,profile:mProfile};
   let done=0;
   for(let file of pendingFiles){
+    document.getElementById('progressStatus').textContent=`Laster opp ${done+1} av ${pendingFiles.length}: ${file.name}`;
     const ext=file.name.match(/\.[^.]+$/)?.[0]||'';
     const slugParts=['Moelven',...prodColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))];
     const autoSlug=slugParts.join('-');
@@ -638,6 +660,7 @@ async function saveImage(){
     catch(e){showToast('Feil: '+file.name);}
     done++;document.getElementById('progressFill').style.width=Math.round(done/pendingFiles.length*100)+'%';
   }
+  document.getElementById('progressStatus').style.display='none';
   saveBtn.disabled=false;cancelBtn.disabled=false;saveBtn.textContent='Lagre til mediabank';
   closeModal();renderAll();showToast(`${done} bilde${done!==1?'r':''} lastet opp!`);
 }
