@@ -566,6 +566,7 @@ async function getOrCreateOptiFolder(baseName){
   });
   return (await cr2.json()).id;
 }
+let accessToken=null, images=[], activeCat=null, activeProd=null, searchQ='';
 let selected=new Set(), pendingFiles=[];
 let mCats=new Set(), mProds=new Set(), mProdColors=new Map(), mExtras=new Set(), mProfile=null;
 let currentCountry = localStorage.getItem('moelven_country') || null;
