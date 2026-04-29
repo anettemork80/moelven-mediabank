@@ -180,7 +180,14 @@
   .country-cards { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
   .country-card { background:white; border:2px solid var(--border); border-radius:12px; padding:28px 36px; text-align:center; cursor:pointer; transition:all 0.18s; min-width:160px; }
   .country-card:hover { border-color:var(--teal); transform:translateY(-3px); box-shadow:0 8px 24px rgba(12,76,81,0.12); }
-  .country-flag { font-size:48px; display:block; margin-bottom:12px; }
+  .country-flag { font-size:48px; display:block; margin-bottom:12px; line-height:1; }
+  .flag-no { color:#EF2B2D; }
+  .flag-se { color:#006AA7; }
+  .flag-dk { color:#C60C30; }
+  .flag-badge { display:inline-block; width:32px; height:22px; border-radius:3px; vertical-align:middle; margin-right:4px; }
+  .flag-badge-no { background: linear-gradient(to bottom, #EF2B2D 35%, white 35%, white 45%, #EF2B2D 45%); position:relative; overflow:hidden; }
+  .flag-badge-se { background:#006AA7; position:relative; overflow:hidden; }
+  .flag-badge-dk { background:#C60C30; position:relative; overflow:hidden; }
   .country-name { font-size:15px; font-weight:600; color:var(--text); }
   .country-change { position:fixed; bottom:16px; right:16px; background:none; border:1px solid var(--border); border-radius:4px; padding:5px 10px; font-size:12px; color:var(--text-light); cursor:pointer; font-family:'Source Sans 3',sans-serif; }
   .country-change:hover { border-color:var(--teal); color:var(--teal); }
@@ -202,15 +209,21 @@
   <div class="country-sub">Velg ditt marked / Välj din marknad / Vælg dit marked</div>
   <div class="country-cards">
     <div class="country-card" onclick="selectCountry('no')">
-      <span class="country-flag">🇳🇴</span>
+      <span class="country-flag">
+        <svg viewBox="0 0 22 16" width="64" height="46" xmlns="http://www.w3.org/2000/svg"><rect width="22" height="16" fill="#EF2B2D"/><rect x="6" width="4" height="16" fill="white"/><rect y="6" width="22" height="4" fill="white"/><rect x="7" width="2" height="16" fill="#002868"/><rect y="7" width="22" height="2" fill="#002868"/></svg>
+      </span>
       <div class="country-name">Norge</div>
     </div>
     <div class="country-card" onclick="selectCountry('se')">
-      <span class="country-flag">🇸🇪</span>
+      <span class="country-flag">
+        <svg viewBox="0 0 22 16" width="64" height="46" xmlns="http://www.w3.org/2000/svg"><rect width="22" height="16" fill="#006AA7"/><rect x="6" width="4" height="16" fill="#FECC02"/><rect y="6" width="22" height="4" fill="#FECC02"/></svg>
+      </span>
       <div class="country-name">Sverige</div>
     </div>
     <div class="country-card" onclick="selectCountry('dk')">
-      <span class="country-flag">🇩🇰</span>
+      <span class="country-flag">
+        <svg viewBox="0 0 22 16" width="64" height="46" xmlns="http://www.w3.org/2000/svg"><rect width="22" height="16" fill="#C60C30"/><rect x="6" width="4" height="16" fill="white"/><rect y="6" width="22" height="4" fill="white"/></svg>
+      </span>
       <div class="country-name">Danmark</div>
     </div>
   </div>
@@ -450,7 +463,11 @@ const PROFILES_BY_COUNTRY = {
 let TAXONOMY = TAXONOMIES.no;
 let PROFILES = PROFILES_BY_COUNTRY.no;
 let S = STRINGS.no; // current strings
-const FLAGS = {no:'🇳🇴', se:'🇸🇪', dk:'🇩🇰'};
+const FLAGS = {
+  no: '<svg viewBox="0 0 22 16" width="28" height="20" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;border-radius:2px"><rect width="22" height="16" fill="#EF2B2D"/><rect x="6" width="4" height="16" fill="white"/><rect y="6" width="22" height="4" fill="white"/><rect x="7" width="2" height="16" fill="#002868"/><rect y="7" width="22" height="2" fill="#002868"/></svg>',
+  se: '<svg viewBox="0 0 22 16" width="28" height="20" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;border-radius:2px"><rect width="22" height="16" fill="#006AA7"/><rect x="6" width="4" height="16" fill="#FECC02"/><rect y="6" width="22" height="4" fill="#FECC02"/></svg>',
+  dk: '<svg viewBox="0 0 22 16" width="28" height="20" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;border-radius:2px"><rect width="22" height="16" fill="#C60C30"/><rect x="6" width="4" height="16" fill="white"/><rect y="6" width="22" height="4" fill="white"/></svg>'
+};
 let tokenClient;
 
 function selectCountry(code){
@@ -463,7 +480,7 @@ function selectCountry(code){
   document.getElementById('countryChangeBtn').style.display='block';
   document.getElementById('countryChangeBtn').textContent=S.changeCountry;
   const hf=document.getElementById('headerFlag');
-  if(hf){hf.textContent=FLAGS[code];hf.style.display='inline';}
+  if(hf){hf.innerHTML=FLAGS[code];hf.style.display='inline';}
   applyStrings();
   if(accessToken) renderAll();
 }
@@ -519,7 +536,7 @@ window.addEventListener('load', () => {
     document.getElementById('countryChangeBtn').style.display='block';
     document.getElementById('countryChangeBtn').textContent=S.changeCountry;
     const hf=document.getElementById('headerFlag');
-    if(hf){hf.textContent=FLAGS[currentCountry];hf.style.display='inline';}
+    if(hf){hf.innerHTML=FLAGS[currentCountry];hf.style.display='inline';}
     applyStrings();
   }
   const interval = setInterval(() => {
