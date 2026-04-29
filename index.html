@@ -223,6 +223,7 @@
   <div class="header-divider"></div>
   <div class="header-subtitle">Mediabank</div>
   <div class="header-right">
+    <span id="headerFlag" style="font-size:20px;cursor:pointer;" onclick="showCountryScreen()" title="Bytt marked"></span>
     <span class="stats-text" id="statsText"></span>
     <span class="user-info" id="userInfo"></span>
     <button class="login-btn" id="loginBtn" onclick="signIn()">Logg inn med Google</button>
@@ -286,23 +287,21 @@
       <div class="progress-status" id="progressStatus"></div>
     </div>
     <div class="form-group">
-      <label class="form-label">Bildetittel <em>— genereres automatisk hvis du ikke fyller inn</em></label>
+      <label class="form-label" id="labelTitle">Bildetittel <em id="labelTitleSub">— genereres automatisk hvis du ikke fyller inn</em></label>
       <input type="text" class="form-input" id="imgTitle" placeholder="F.eks. Heftig PRO+ kledning med terrasse">
     </div>
     <div class="form-group">
-      <label class="form-label">Kategorier <em>— velg alle som passer</em></label>
-      <div class="cat-cbs" id="catCbs"></div>
+      <label class="form-label" id="labelCategories">Kategorier <em id="labelCatSub">— velg alle som passer</em></label>
     </div>
     <div class="form-group">
-      <label class="form-label">Produkter <em>— velg alle som er synlige, og velg farge der det er aktuelt</em></label>
-      <div class="prod-acc" id="prodAcc"><div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div></div>
+      <label class="form-label" id="labelProducts">Produkter <em id="labelProdSub">— velg alle som er synlige, og velg farge der det er aktuelt</em></label><div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div></div>
     </div>
     <div class="form-group" id="profileWrap" style="display:none">
-      <label class="form-label">Profil <em>— velg én profil</em></label>
+      <label class="form-label" id="labelProfile">Profil <em>— velg én profil</em></label>
       <div id="profileChips"></div>
     </div>
     <div class="form-group">
-      <label class="form-label">Type bilde</label>
+      <label class="form-label" id="labelType">Type bilde</label>
       <div class="extra-tags">
         <div class="e-chip" onclick="toggleExtra(this,'Interiør')">Interiør</div>
         <div class="e-chip" onclick="toggleExtra(this,'Eksteriør')">Eksteriør</div>
@@ -351,15 +350,15 @@
       <div class="cat-cbs" id="editCatCbs"></div>
     </div>
     <div class="form-group">
-      <label class="form-label">Produkter <em>— velg alle som er synlige, og velg farge der det er aktuelt</em></label>
+      <label class="form-label" id="editLabelProducts">Produkter <em>— velg alle som er synlige, og velg farge der det er aktuelt</em></label>
       <div class="prod-acc" id="editProdAcc"><div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div></div>
     </div>
     <div class="form-group" id="editProfileWrap" style="display:none">
-      <label class="form-label">Profil <em>— velg én profil</em></label>
+      <label class="form-label" id="editLabelProfile">Profil <em>— velg én profil</em></label>
       <div id="editProfileChips"></div>
     </div>
     <div class="form-group">
-      <label class="form-label">Type bilde</label>
+      <label class="form-label" id="editLabelType">Type bilde</label>
       <div class="extra-tags" id="editExtraTags"></div>
     </div>
     <div class="form-group">
@@ -410,9 +409,9 @@ let currentCountry = localStorage.getItem('moelven_country') || null;
 
 // Per-country strings
 const STRINGS = {
-  no: { search:'Søk på produkt, farge, tema…', upload:'Last opp bilde', allImages:'Alle bilder', categories:'Kategorier', noResults:'Ingen bilder matcher søket.', noImages:'Ingen bilder ennå. Trykk «Last opp bilde» for å starte!', searchInCat:'Ingen treff på', inCat:'i', tryAll:'søk i alle bilder', foundIn:'Fant', otherCats:'bilder i andre kategorier –', logout:'Logg ut', login:'Logg inn med Google', saving:'Lagrer…', uploading:'Laster opp…', saveBtn:'Lagre til mediabank', cancel:'Avbryt', saveChanges:'Lagre endringer', marketLabel:'Marked', creditLabel:'Fotokreditering', titleLabel:'Bildetittel', categoriesLabel:'Kategorier', productsLabel:'Produkter', typeLabel:'Type bilde', profileLabel:'Profil', changeCountry:'🇳🇴 Bytt marked' },
-  se: { search:'Sök på produkt, färg, tema…', upload:'Ladda upp bild', allImages:'Alla bilder', categories:'Kategorier', noResults:'Inga bilder matchar söket.', noImages:'Inga bilder ännu. Tryck «Ladda upp bild» för att börja!', searchInCat:'Inga träffar på', inCat:'i', tryAll:'sök i alla bilder', foundIn:'Hittade', otherCats:'bilder i andra kategorier –', logout:'Logga ut', login:'Logga in med Google', saving:'Sparar…', uploading:'Laddar upp…', saveBtn:'Spara till mediabank', cancel:'Avbryt', saveChanges:'Spara ändringar', marketLabel:'Marknad', creditLabel:'Fotokreditering', titleLabel:'Bildtitel', categoriesLabel:'Kategorier', productsLabel:'Produkter', typeLabel:'Typ av bild', profileLabel:'Profil', changeCountry:'🇸🇪 Byt marknad' },
-  dk: { search:'Søg på produkt, farve, tema…', upload:'Upload billede', allImages:'Alle billeder', categories:'Kategorier', noResults:'Ingen billeder matcher søgningen.', noImages:'Ingen billeder endnu. Klik «Upload billede» for at starte!', searchInCat:'Ingen resultater for', inCat:'i', tryAll:'søg i alle billeder', foundIn:'Fandt', otherCats:'billeder i andre kategorier –', logout:'Log ud', login:'Log ind med Google', saving:'Gemmer…', uploading:'Uploader…', saveBtn:'Gem til mediabank', cancel:'Annuller', saveChanges:'Gem ændringer', marketLabel:'Marked', creditLabel:'Fotokreditering', titleLabel:'Billedtitel', categoriesLabel:'Kategorier', productsLabel:'Produkter', typeLabel:'Billedtype', profileLabel:'Profil', changeCountry:'🇩🇰 Skift marked' }
+  no: { search:'Søk på produkt, farge, tema…', upload:'Last opp bilde', allImages:'Alle bilder', categories:'Kategorier', noResults:'Ingen bilder matcher søket.', noImages:'Ingen bilder ennå. Trykk «Last opp bilde» for å starte!', searchInCat:'Ingen treff på', inCat:'i', tryAll:'søk i alle bilder', foundIn:'Fant', otherCats:'bilder i andre kategorier –', logout:'Logg ut', login:'Logg inn med Google', saving:'Lagrer…', uploading:'Laster opp…', saveBtn:'Lagre til mediabank', cancel:'Avbryt', saveChanges:'Lagre endringer', marketLabel:'Marked', marketSub:'— velg alle som gjelder', creditLabel:'Fotokreditering', creditSub:'— fotograf eller byrå', titleLabel:'Bildetittel', titleSub:'— genereres automatisk hvis du ikke fyller inn', categoriesLabel:'Kategorier', catSub:'— velg alle som passer', productsLabel:'Produkter', prodSub:'— velg alle som er synlige, og velg farge der det er aktuelt', typeLabel:'Type bilde', profileLabel:'Profil', uploadTitle:'Last opp bilde', uploadSub:'Bildet lagres i Google Drive og tagges med kategorier og produkter.', editTitle:'Rediger bildedata', editSub:'Endringer lagres tilbake til Google Drive.', changeCountry:'🇳🇴 Bytt marked', velgKat:'Velg kategorier ovenfor' },
+  se: { search:'Sök på produkt, färg, tema…', upload:'Ladda upp bild', allImages:'Alla bilder', categories:'Kategorier', noResults:'Inga bilder matchar söket.', noImages:'Inga bilder ännu. Tryck «Ladda upp bild» för att börja!', searchInCat:'Inga träffar på', inCat:'i', tryAll:'sök i alla bilder', foundIn:'Hittade', otherCats:'bilder i andra kategorier –', logout:'Logga ut', login:'Logga in med Google', saving:'Sparar…', uploading:'Laddar upp…', saveBtn:'Spara till mediabank', cancel:'Avbryt', saveChanges:'Spara ändringar', marketLabel:'Marknad', marketSub:'— välj alla som gäller', creditLabel:'Fotokreditering', creditSub:'— fotograf eller byrå', titleLabel:'Bildtitel', titleSub:'— genereras automatiskt om du inte fyller i', categoriesLabel:'Kategorier', catSub:'— välj alla som passar', productsLabel:'Produkter', prodSub:'— välj alla som syns, och välj färg där det är aktuellt', typeLabel:'Typ av bild', profileLabel:'Profil', uploadTitle:'Ladda upp bild', uploadSub:'Bilden sparas i Google Drive och taggas med kategorier och produkter.', editTitle:'Redigera bilddata', editSub:'Ändringar sparas tillbaka till Google Drive.', changeCountry:'🇸🇪 Byt marknad', velgKat:'Välj kategorier ovan' },
+  dk: { search:'Søg på produkt, farve, tema…', upload:'Upload billede', allImages:'Alle billeder', categories:'Kategorier', noResults:'Ingen billeder matcher søgningen.', noImages:'Ingen billeder endnu. Klik «Upload billede» for at starte!', searchInCat:'Ingen resultater for', inCat:'i', tryAll:'søg i alle billeder', foundIn:'Fandt', otherCats:'billeder i andre kategorier –', logout:'Log ud', login:'Log ind med Google', saving:'Gemmer…', uploading:'Uploader…', saveBtn:'Gem til mediabank', cancel:'Annuller', saveChanges:'Gem ændringer', marketLabel:'Marked', marketSub:'— vælg alle der gælder', creditLabel:'Fotokreditering', creditSub:'— fotograf eller bureau', titleLabel:'Billedtitel', titleSub:'— genereres automatisk hvis du ikke udfylder', categoriesLabel:'Kategorier', catSub:'— vælg alle der passer', productsLabel:'Produkter', prodSub:'— vælg alle der er synlige, og vælg farve hvor det er relevant', typeLabel:'Billedtype', profileLabel:'Profil', uploadTitle:'Upload billede', uploadSub:'Billedet gemmes i Google Drive og tagges med kategorier og produkter.', editTitle:'Rediger billeddata', editSub:'Ændringer gemmes tilbage til Google Drive.', changeCountry:'🇩🇰 Skift marked', velgKat:'Vælg kategorier ovenfor' }
 };
 
 // Per-country taxonomy
@@ -453,6 +452,8 @@ let PROFILES = PROFILES_BY_COUNTRY.no;
 let S = STRINGS.no; // current strings
 let tokenClient;
 
+const FLAGS = {no:'🇳🇴', se:'🇸🇪', dk:'🇩🇰'};
+
 function selectCountry(code){
   currentCountry=code;
   localStorage.setItem('moelven_country',code);
@@ -462,16 +463,46 @@ function selectCountry(code){
   document.getElementById('countryScreen').classList.remove('show');
   document.getElementById('countryChangeBtn').style.display='block';
   document.getElementById('countryChangeBtn').textContent=S.changeCountry;
+  const hf=document.getElementById('headerFlag');if(hf)hf.textContent=FLAGS[code]||'';
   applyStrings();
   if(accessToken) renderAll();
 }
 function showCountryScreen(){ document.getElementById('countryScreen').classList.add('show'); }
 function applyStrings(){
-  const s=document.getElementById('searchInput'); if(s) s.placeholder=S.search;
-  const lo=document.getElementById('logoutBtn'); if(lo) lo.textContent=S.logout;
-  const li=document.getElementById('loginBtn'); if(li) li.textContent=S.login;
-  const sb=document.getElementById('saveBtn'); if(sb) sb.textContent=S.saveBtn;
-  const cb=document.getElementById('cancelBtn'); if(cb) cb.textContent=S.cancel;
+  const set=(id,txt)=>{const el=document.getElementById(id);if(el&&txt!==undefined)el.textContent=txt;};
+  const setFirst=(id,txt)=>{const el=document.getElementById(id);if(el&&el.firstChild)el.firstChild.textContent=txt+' ';};
+  const setSub=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
+
+  // Toolbar
+  const si=document.getElementById('searchInput');if(si)si.placeholder=S.search;
+  const ub=document.querySelector('.upload-btn');if(ub)ub.lastChild.textContent=' '+S.upload;
+  const lo=document.getElementById('logoutBtn');if(lo)lo.textContent=S.logout;
+  const li=document.getElementById('loginBtn');if(li)li.textContent=S.login;
+
+  // Upload modal
+  setFirst('labelTitle',S.titleLabel); setSub('labelTitleSub',S.titleSub);
+  setFirst('labelCategories',S.categoriesLabel); setSub('labelCatSub',S.catSub);
+  setFirst('labelProducts',S.productsLabel); 
+  set('labelProfile',S.profileLabel);
+  set('labelType',S.typeLabel);
+  setFirst('labelMarket',S.marketLabel);
+  setFirst('labelCredit',S.creditLabel);
+
+  // Edit modal
+  setFirst('editLabelProducts',S.productsLabel);
+  set('editLabelProfile',S.profileLabel);
+  set('editLabelType',S.typeLabel);
+  setFirst('editLabelMarket',S.marketLabel);
+  setFirst('editLabelCredit',S.creditLabel);
+
+  // Buttons
+  const sb=document.getElementById('saveBtn');if(sb)sb.textContent=S.saveBtn;
+  const cb=document.getElementById('cancelBtn');if(cb)cb.textContent=S.cancel;
+  const esb=document.getElementById('editSaveBtn');if(esb)esb.textContent=S.saveChanges;
+  const ecb=document.getElementById('editCancelBtn');if(ecb)ecb.textContent=S.cancel;
+
+  // Country change button
+  const ccb=document.getElementById('countryChangeBtn');if(ccb)ccb.textContent=S.changeCountry;
 }
 function toggleMarket(el){ el.classList.toggle('selected'); }
 function getSelectedMarkets(containerId){
@@ -487,6 +518,7 @@ window.addEventListener('load', () => {
     document.getElementById('countryScreen').classList.remove('show');
     document.getElementById('countryChangeBtn').style.display='block';
     document.getElementById('countryChangeBtn').textContent=S.changeCountry;
+    const hf=document.getElementById('headerFlag');if(hf)hf.textContent=FLAGS[currentCountry]||'';
     applyStrings();
   }
   const interval = setInterval(() => {
@@ -676,7 +708,7 @@ function renderProfileChips(){
 function selectProfile(p){mProfile=mProfile===p?null:p;renderProfileChips();}
 function renderProdAcc(){
   const acc=document.getElementById('prodAcc');
-  if(!mCats.size){acc.innerHTML='<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div>';return;}
+  if(!mCats.size){acc.innerHTML=`<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">${S.velgKat}</div>`;return;}
   acc.innerHTML=[...mCats].map(cat=>`
     <div class="prod-cat-hd">${cat}</div>
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
@@ -814,7 +846,7 @@ function eRenderProfileChips(){
 function eSelectProfile(p){eProfile=eProfile===p?null:p;eRenderProfileChips();}
 function eRenderProdAcc(){
   const acc=document.getElementById('editProdAcc');
-  if(!eCats.size){acc.innerHTML='<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">Velg kategorier ovenfor</div>';return;}
+  if(!eCats.size){acc.innerHTML=`<div style="padding:14px;color:#c0b8b2;font-size:12.5px;text-align:center;">${S.velgKat}</div>`;return;}
   acc.innerHTML=[...eCats].map(cat=>`
     <div class="prod-cat-hd">${cat}</div>
     <div class="prod-items">${Object.entries(TAXONOMY[cat].products).map(([p,colors])=>`
