@@ -170,7 +170,21 @@
   .toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:var(--dark-brown); color:white; padding:10px 20px; border-radius:6px; font-size:14.9px; z-index:300; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
   .toast.show { opacity:1; }
   .edit-btn { position:absolute; bottom:7px; left:7px; background:rgba(255,255,255,0.9); border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-family:'Source Sans 3',sans-serif; color:var(--teal); font-weight:600; cursor:pointer; opacity:0; transition:opacity 0.15s; }
-  .card:hover .edit-btn { opacity:1; }
+  .delete-btn { position:absolute; bottom:7px; left:72px; background:rgba(255,255,255,0.9); border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-family:'Source Sans 3',sans-serif; color:#c0392b; font-weight:600; cursor:pointer; opacity:0; transition:opacity 0.15s; }
+  .card:hover .edit-btn, .card:hover .delete-btn { opacity:1; }
+  .inbox-reject-btn { background:white; color:#c0392b; border:1.5px solid #e0a0a0; border-radius:4px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Source Sans 3',sans-serif; }
+
+  /* Optimizely formats */
+  .opti-toggle { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg-green); border:1.5px solid #c8e6cc; border-radius:6px; cursor:pointer; user-select:none; }
+  .opti-toggle input { width:16px; height:16px; accent-color:var(--teal); cursor:pointer; }
+  .opti-toggle-label { font-size:13.5px; font-weight:600; color:var(--teal); }
+  .opti-formats { display:none; margin-top:10px; display:none; }
+  .opti-formats.show { display:block; }
+  .opti-formats-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; }
+  .opti-format-item { display:flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--border); border-radius:5px; cursor:pointer; font-size:12.5px; background:white; user-select:none; }
+  .opti-format-item input { width:14px; height:14px; accent-color:var(--teal); cursor:pointer; flex-shrink:0; }
+  .opti-format-name { flex:1; color:var(--text); }
+  .opti-format-size { font-size:11px; color:var(--text-light); }
 
   /* Country selector */
   #countryScreen { display:none; position:fixed; inset:0; background:var(--bg-cream); z-index:1000; align-items:center; justify-content:center; flex-direction:column; }
@@ -359,6 +373,17 @@
       <label class="form-label" id="labelCredit">Fotokreditering <em>— fotograf eller byrå</em></label>
       <input type="text" class="form-input" id="imgCredit" placeholder="F.eks. Johansen Foto AS">
     </div>
+    <div class="form-group">
+      <label class="opti-toggle" onclick="toggleOptiSection()">
+        <input type="checkbox" id="optiToggle" onclick="event.stopPropagation();toggleOptiSection()">
+        <span class="opti-toggle-label">Generer Optimizely-formater</span>
+        <span style="font-size:12px;color:rgba(12,76,81,0.6);font-weight:400;margin-left:auto;">Beskjærer og skalerer bildet automatisk</span>
+      </label>
+      <div class="opti-formats" id="optiFormats">
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Velg formatene du vil generere:</div>
+        <div class="opti-formats-grid" id="optiFormatGrid"></div>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelBtn" onclick="closeModal()">Avbryt</button>
       <button class="btn-save" id="saveBtn" onclick="saveImage()">Lagre til mediabank</button>
@@ -443,7 +468,104 @@ const CLIENT_ID = '97591089619-ov8t3bcs7kh98pnuq8sk1pmvanh90f09.apps.googleuserc
 const FOLDER_ID = '1zbcjB56XcCgeJKgwsW0KECME-tKkMgjy';
 const SCOPES = 'https://www.googleapis.com/auth/drive';
 
-let accessToken=null, images=[], activeCat=null, activeProd=null, searchQ='';
+const OPTI_FORMATS = [
+  {id:'related_articles',    name:'Related Articles',              w:600,  h:381},
+  {id:'main_image_article',  name:'Main image (Article)',          w:1350, h:505},
+  {id:'landscape_carousel',  name:'Landscape image carousel',      w:1920, h:1080},
+  {id:'article_carousel',    name:'Article carousel',              w:700,  h:700},
+  {id:'teaser',              name:'Teaser',                        w:800,  h:509},
+  {id:'campaign_banner',     name:'Campaign banner',               w:1350, h:760},
+  {id:'image_with_text',     name:'Image with text',               w:1094, h:875},
+  {id:'portrait_carousel',   name:'Portrait image carousel',       w:1080, h:1350},
+  {id:'related_page_block',  name:'Related page block',            w:650,  h:365},
+  {id:'produktkategori',     name:'Main image produktkategori',    w:720,  h:480},
+  {id:'page_shortcut',       name:'Page shortcut block',           w:1300, h:731},
+  {id:'related_news',        name:'Related news',                  w:600,  h:337},
+  {id:'article_shortcut',    name:'Article shortcut block',        w:250,  h:250},
+  {id:'article_carousel2',   name:'Article carousel block 2',      w:1200, h:600}
+];
+
+function toggleOptiSection(){
+  const cb=document.getElementById('optiToggle');
+  const wrap=document.getElementById('optiFormats');
+  cb.checked=!cb.checked;
+  wrap.classList.toggle('show',cb.checked);
+  if(cb.checked && !document.getElementById('optiFormatGrid').children.length){
+    renderOptiFormats();
+  }
+}
+
+function renderOptiFormats(){
+  document.getElementById('optiFormatGrid').innerHTML=OPTI_FORMATS.map(f=>
+    `<label class="opti-format-item">
+      <input type="checkbox" class="opti-fmt-cb" data-id="${f.id}" checked>
+      <span class="opti-format-name">${f.name}</span>
+      <span class="opti-format-size">${f.w}×${f.h}</span>
+    </label>`
+  ).join('');
+}
+
+function getSelectedOptiFormats(){
+  return [...document.querySelectorAll('.opti-fmt-cb:checked')].map(cb=>{
+    const id=cb.getAttribute('data-id');
+    return OPTI_FORMATS.find(f=>f.id===id);
+  }).filter(Boolean);
+}
+
+async function generateOptiVersion(sourceFile, format){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const {w,h}=format;
+        // Smart crop: scale to cover, then center-crop
+        const srcRatio=img.width/img.height;
+        const dstRatio=w/h;
+        let sx,sy,sw,sh;
+        if(srcRatio>dstRatio){
+          sh=img.height; sw=sh*dstRatio;
+          sx=(img.width-sw)/2; sy=0;
+        } else {
+          sw=img.width; sh=sw/dstRatio;
+          sx=0; sy=(img.height-sh)/2;
+        }
+        const canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,w,h);
+        canvas.toBlob(blob=>{
+          const name=`${format.w}x${format.h}_${format.name.replace(/[^a-zA-Z0-9]/g,'_')}.jpg`;
+          resolve(new File([blob],name,{type:'image/jpeg'}));
+        },'image/jpeg',0.90);
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(sourceFile);
+  });
+}
+
+async function getOrCreateOptiFolder(baseName){
+  // Look for existing Optimizely parent folder
+  let optiParentId;
+  const q1=encodeURIComponent(`'${FOLDER_ID}' in parents and name='Optimizely' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const r1=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q1}&fields=files(id,name)`,{headers:{Authorization:'Bearer '+accessToken}});
+  const d1=await r1.json();
+  if(d1.files&&d1.files.length){
+    optiParentId=d1.files[0].id;
+  } else {
+    const cr=await fetch('https://www.googleapis.com/drive/v3/files',{
+      method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({name:'Optimizely',mimeType:'application/vnd.google-apps.folder',parents:[FOLDER_ID]})
+    });
+    optiParentId=(await cr.json()).id;
+  }
+  // Create subfolder for this image
+  const cr2=await fetch('https://www.googleapis.com/drive/v3/files',{
+    method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+    body:JSON.stringify({name:baseName,mimeType:'application/vnd.google-apps.folder',parents:[optiParentId]})
+  });
+  return (await cr2.json()).id;
+}
 let selected=new Set(), pendingFiles=[];
 let mCats=new Set(), mProds=new Set(), mProdColors=new Map(), mExtras=new Set(), mProfile=null;
 let currentCountry = localStorage.getItem('moelven_country') || null;
@@ -629,7 +751,7 @@ async function loadImages() {
     images = (data.files || []).map(f => {
       let meta = {};
       try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
-      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
+      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, localMeta:meta.localMeta||{}, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
     });
     renderAll();
   } catch(e) {
@@ -646,12 +768,20 @@ async function uploadToDrive(file, meta, fileName) {
   }).then(r => r.json());
 }
 
+function getImgMeta(img){
+  if(currentCountry && img.uploadedBy !== currentCountry && img.localMeta?.[currentCountry]){
+    const local=img.localMeta[currentCountry];
+    return {title:local.title||img.title,categories:local.categories||img.categories,products:local.products||img.products,colors:local.colors||img.colors,extras:local.extras||img.extras,credit:local.credit||img.credit,profile:local.profile||img.profile};
+  }
+  return img;
+}
+
 function renderSidebar() {
   // Inbox: images tagged for current country but not yet locally tagged (approved)
   const inboxImages = currentCountry ? images.filter(i=>
     i.markets && i.markets.includes(currentCountry) &&
     i.uploadedBy !== currentCountry &&
-    !(i.localTags?.[currentCountry])
+    !i.localTags?.[currentCountry]
   ) : [];
 
   let h='';
@@ -702,26 +832,28 @@ function renderGrid() {
     g.innerHTML=emptyMsg; return;
   }
   g.innerHTML=f.map(img=>{
+    const m=getImgMeta(img); // use market-specific metadata if available
     const thumb=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s400'):'';
     const full=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s1600'):'';
     const sizeStr=img.fileSize?formatSize(img.fileSize):'';
     return`<div class="card ${selected.has(img.id)?'selected':''}" onclick="toggleSel('${img.id}')">
-      <div class="card-img" onclick="event.stopPropagation();${thumb?`openLightbox('${full||thumb}','${img.title.replace(/'/g,"\\'")}')`:''}" style="${thumb?'cursor:zoom-in':''}">
+      <div class="card-img" onclick="event.stopPropagation();${thumb?`openLightbox('${full||thumb}','${m.title.replace(/'/g,"\\'")}')`:''}" style="${thumb?'cursor:zoom-in':''}">
         ${thumb?`<img src="${thumb}" alt="" loading="lazy">`:`<div class="card-placeholder"><svg style="width:28px;height:28px;opacity:0.22" viewBox="0 0 32 32" fill="none"><rect x="2" y="6" width="28" height="20" rx="2" stroke="#473b33" stroke-width="2"/><circle cx="11" cy="13" r="2.5" stroke="#473b33" stroke-width="2"/><path d="M2 22l7-5 5 4 5-6 11 7" stroke="#473b33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Bilde</span></div>`}
-        ${img.categories.length>1?`<div class="multi-badge">${img.categories.length} kat.</div>`:''}
+        ${m.categories.length>1?`<div class="multi-badge">${m.categories.length} kat.</div>`:''}
         <div class="card-check">✓</div>
         ${thumb?`<div class="zoom-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3.5" stroke="#473b33" stroke-width="1.2"/><path d="M8 8l2.5 2.5" stroke="#473b33" stroke-width="1.2" stroke-linecap="round"/></svg></div>`:''}
-        <button class="edit-btn" onclick="event.stopPropagation();openEditModal('${img.id}')">Rediger</button>      </div>
+        <button class="edit-btn" onclick="event.stopPropagation();openEditModal('${img.id}')">Rediger</button>
+        <button class="delete-btn" onclick="event.stopPropagation();deleteImage('${img.id}')">Slett</button>      </div>
       <div class="card-body">
-        <div class="card-name">${img.title}</div>
+        <div class="card-name">${m.title}</div>
         <div class="card-tags">
-          ${img.categories.map(c=>`<span class="tag tag-cat">${c}</span>`).join('')}
-          ${img.colors.slice(0,2).map(c=>`<span class="tag tag-color">${c}</span>`).join('')}
-          ${img.extras.slice(0,2).map(e=>`<span class="tag tag-extra">${e}</span>`).join('')}
-          ${img.profile?`<span class="tag" style="background:rgba(12,76,81,0.07);color:var(--teal-light);">${img.profile}</span>`:''}
+          ${m.categories.map(c=>`<span class="tag tag-cat">${c}</span>`).join('')}
+          ${m.colors.slice(0,2).map(c=>`<span class="tag tag-color">${c}</span>`).join('')}
+          ${m.extras.slice(0,2).map(e=>`<span class="tag tag-extra">${e}</span>`).join('')}
+          ${m.profile?`<span class="tag" style="background:rgba(12,76,81,0.07);color:var(--teal-light);">${m.profile}</span>`:''}
           ${sizeStr?`<span class="tag tag-size">${sizeStr}</span>`:''}
         </div>
-        ${img.credit?`<div class="card-credit">© ${img.credit}</div>`:''}
+        ${m.credit?`<div class="card-credit">© ${m.credit}</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -744,6 +876,8 @@ async function downloadSelected(){
 
 function openModal(){
   mCats=new Set();mProds=new Set();mProdColors=new Map();mExtras=new Set();mProfile=null;
+  const optiCb=document.getElementById('optiToggle');
+  if(optiCb){optiCb.checked=false;document.getElementById('optiFormats').classList.remove('show');document.getElementById('optiFormatGrid').innerHTML='';}
   // Reset market chips - default to current country
   document.querySelectorAll('#marketChips .market-chip').forEach(chip=>{
     chip.classList.toggle('selected', chip.getAttribute('data-market')===currentCountry);
@@ -864,9 +998,41 @@ async function saveImage(){
     catch(e){showToast('Feil: '+file.name);}
     done++;document.getElementById('progressFill').style.width=Math.round(done/pendingFiles.length*100)+'%';
   }
+
+  // Generate Optimizely versions if requested
+  const optiCb=document.getElementById('optiToggle');
+  if(optiCb&&optiCb.checked&&pendingFiles.length>0){
+    const selectedFormats=getSelectedOptiFormats();
+    if(selectedFormats.length>0){
+      document.getElementById('progressStatus').style.display='block';
+      document.getElementById('progressStatus').textContent='Oppretter Optimizely-mappe…';
+      try{
+        // Use first file as source, strip extension for folder name
+        const sourceFile=pendingFiles[0];
+        const baseName=sourceFile.name.replace(/\.[^.]+$/,'');
+        const folderId=await getOrCreateOptiFolder(baseName);
+        for(let i=0;i<selectedFormats.length;i++){
+          const fmt=selectedFormats[i];
+          document.getElementById('progressStatus').textContent=`Genererer ${fmt.name} (${i+1}/${selectedFormats.length})…`;
+          document.getElementById('progressFill').style.width=Math.round((i+1)/selectedFormats.length*100)+'%';
+          const optiFile=await generateOptiVersion(sourceFile,fmt);
+          const form=new FormData();
+          form.append('metadata',new Blob([JSON.stringify({name:optiFile.name,parents:[folderId]})],{type:'application/json'}));
+          form.append('file',optiFile);
+          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+            method:'POST',headers:{Authorization:'Bearer '+accessToken},body:form
+          });
+        }
+        showToast(`${done} bilde${done!==1?'r':''} lastet opp + ${selectedFormats.length} Optimizely-formater generert!`);
+      } catch(e){ showToast('Feil ved generering av Optimizely-formater.'); }
+    }
+  } else {
+    showToast(`${done} bilde${done!==1?'r':''} lastet opp!`);
+  }
+
   document.getElementById('progressStatus').style.display='none';
   saveBtn.disabled=false;cancelBtn.disabled=false;saveBtn.textContent='Lagre til mediabank';
-  closeModal();renderAll();showToast(`${done} bilde${done!==1?'r':''} lastet opp!`);
+  closeModal();renderAll();
 }
 
 let editId=null, eCats=new Set(), eProds=new Set(), eProdColors=new Map(), eExtras=new Set(), eProfile=null;
@@ -875,15 +1041,19 @@ const EXTRA_TAGS=['Interiør','Eksteriør','Miljøbilde','Produktbilde','Detalj'
 function openEditModal(id){
   const img=images.find(i=>i.id===id); if(!img) return;
   editId=id;
-  eCats=new Set(img.categories||[]);
-  eProds=new Set(img.products||[]);
+  // Use local market metadata if this image is from another market
+  const isFromOtherMarket = currentCountry && img.uploadedBy !== currentCountry;
+  const local = isFromOtherMarket && img.localMeta?.[currentCountry];
+  const src = local ? {...img, ...local} : img;
+  eCats=new Set(src.categories||[]);
+  eProds=new Set(src.products||[]);
   eProdColors=new Map();
-  if(img.prodColorPairs){img.prodColorPairs.forEach(({prod,color})=>{if(color)eProdColors.set(prod,color);});}
-  else if(img.colors&&img.colors.length){[...eProds].forEach(p=>{const cats=[...eCats];for(const cat of cats){const cs=TAXONOMY[cat]?.products[p];if(cs&&cs.length){const match=img.colors.find(c=>cs.includes(c));if(match)eProdColors.set(p,match);}}})}
-  eExtras=new Set(img.extras||[]);
-  document.getElementById('editTitle').value=img.title||'';
-  document.getElementById('editCredit').value=img.credit||'';
-  eProfile=img.profile||null;
+  if(src.prodColorPairs){src.prodColorPairs.forEach(({prod,color})=>{if(color)eProdColors.set(prod,color);});}
+  else if(src.colors&&src.colors.length){[...eProds].forEach(p=>{const cats=[...eCats];for(const cat of cats){const cs=TAXONOMY[cat]?.products[p];if(cs&&cs.length){const match=src.colors.find(c=>cs.includes(c));if(match)eProdColors.set(p,match);}}})}
+  eExtras=new Set(src.extras||[]);
+  document.getElementById('editTitle').value=src.title||'';
+  document.getElementById('editCredit').value=src.credit||'';
+  eProfile=src.profile||null;
   // Pre-select markets
   document.querySelectorAll('#editMarketChips .market-chip').forEach(chip=>{
     const m=chip.getAttribute('data-market');
@@ -935,6 +1105,7 @@ async function saveEdit(){
   const saveBtn=document.getElementById('editSaveBtn'),cancelBtn=document.getElementById('editCancelBtn');
   saveBtn.disabled=true; cancelBtn.disabled=true; saveBtn.textContent='Lagrer…';
   const img=images.find(i=>i.id===editId);
+  const isFromOtherMarket = currentCountry && img.uploadedBy !== currentCountry;
   const typedTitle=document.getElementById('editTitle').value.trim();
   // Flush any free-text color inputs not yet stored via onblur
   document.querySelectorAll('#editProdAcc input.free-color-input').forEach(input=>{
@@ -944,28 +1115,39 @@ async function saveEdit(){
   const eProdColorPairs=[...eProds].map(p=>({prod:p,color:eProdColors.get(p)||null}));
   const eColors=[...new Set(eProdColorPairs.map(({color})=>color).filter(Boolean))];
   const autoTitle=['Moelven',...eProdColorPairs.map(({prod,color})=>prod+(color?' '+color:''))].join(' ');
-  // Only use typed title if user manually changed it (different from original)
-  const userChangedTitle = typedTitle && typedTitle !== img.title;
+  const userChangedTitle = typedTitle && typedTitle !== (isFromOtherMarket?img.localMeta?.[currentCountry]?.title:img.title);
   const newTitle=userChangedTitle?typedTitle:autoTitle;
-  const meta={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile,markets:getSelectedMarkets('editMarketChips')};
+  const localData={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile};
+
+  let metaToSave;
+  let newFileName;
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
-  const newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
+
+  if(isFromOtherMarket){
+    // Store as local market metadata, don't touch original
+    if(!img.localMeta) img.localMeta={};
+    img.localMeta[currentCountry]=localData;
+    if(!img.localTags) img.localTags={};
+    img.localTags[currentCountry]=true;
+    metaToSave={...img, localMeta:img.localMeta, localTags:img.localTags};
+    newFileName=img.name; // keep original filename
+  } else {
+    // Own market – update normally
+    newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
+    metaToSave={...img,...localData,markets:getSelectedMarkets('editMarketChips'),name:newFileName};
+    img.title=newTitle; img.name=newFileName;
+    img.categories=[...eCats]; img.products=[...eProds];
+    img.colors=eColors; img.prodColorPairs=eProdColorPairs;
+    img.extras=[...eExtras]; img.credit=localData.credit; img.profile=eProfile;
+    img.markets=getSelectedMarkets('editMarketChips');
+  }
+
   try{
     await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
       method:'PATCH',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({name:newFileName,description:JSON.stringify(meta)})
+      body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
     });
-    img.title=newTitle;
-    img.name=newFileName;
-    img.categories=[...eCats];
-    img.products=[...eProds];
-    img.colors=eColors;
-    img.prodColorPairs=eProdColorPairs;
-    img.extras=[...eExtras];
-    img.credit=document.getElementById('editCredit').value.trim();
-    img.profile=eProfile;
-    img.markets=getSelectedMarkets('editMarketChips');
     closeEditModal();
     renderAll();
     showToast('Endringer lagret!');
@@ -997,6 +1179,7 @@ function openInbox(){
           <div class="inbox-title">${img.title}</div>
           <div class="inbox-meta">${img.categories.join(', ')}${img.colors.length?' · '+img.colors.join(', '):''}</div>
           <div class="inbox-actions">
+            <button class="inbox-reject-btn" onclick="rejectFromInbox('${img.id}')">Avvis</button>
             <button class="inbox-edit-btn" onclick="approveFromInbox('${img.id}',true)">${S.inboxEdit}</button>
             <button class="inbox-approve-btn" onclick="approveFromInbox('${img.id}',false)">${S.inboxApprove}</button>
           </div>
@@ -1031,6 +1214,40 @@ async function approveFromInbox(id, openEdit){
 document.getElementById('inboxModal').addEventListener('click',e=>{if(e.target===document.getElementById('inboxModal'))document.getElementById('inboxModal').classList.remove('open');});
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+
+async function deleteImage(id){
+  const img=images.find(i=>i.id===id);
+  if(!img) return;
+  if(!confirm(`Slette «${img.title}»? Dette kan ikke angres.`)) return;
+  try{
+    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
+      method:'DELETE',
+      headers:{Authorization:'Bearer '+accessToken}
+    });
+    images=images.filter(i=>i.id!==id);
+    selected.delete(id);
+    renderAll();
+    showToast('Bildet ble slettet.');
+  } catch(e){ showToast('Feil ved sletting.'); }
+}
+
+async function rejectFromInbox(id){
+  const img=images.find(i=>i.id===id);
+  if(!img) return;
+  if(!confirm('Avvis dette bildet fra innboksen? Det vil ikke vises her igjen.')) return;
+  if(!img.localTags) img.localTags={};
+  img.localTags[currentCountry]='rejected';
+  try{
+    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
+      method:'PATCH',
+      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({description:JSON.stringify({...img})})
+    });
+    document.getElementById('inboxModal').classList.remove('open');
+    renderAll();
+    showToast('Bilde avvist fra innboksen.');
+  } catch(e){ showToast('Feil ved avvisning.'); }
+}
 
 function formatSize(bytes){if(!bytes)return'';if(bytes<1024*1024)return Math.round(bytes/1024)+'KB';return(bytes/(1024*1024)).toFixed(1)+'MB';}
 
