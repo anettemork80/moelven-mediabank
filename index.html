@@ -1165,11 +1165,11 @@ function eToggleExtra(el,t){eExtras.has(t)?(eExtras.delete(t),el.classList.remov
 async function saveEdit(){
   if(!editId) return;
   const saveBtn=document.getElementById('editSaveBtn'),cancelBtn=document.getElementById('editCancelBtn');
-  saveBtn.disabled=true; cancelBtn.disabled=true; saveBtn.textContent='Lagrer…';
+  saveBtn.disabled=true; cancelBtn.disabled=true; saveBtn.textContent=S.saving;
   const img=images.find(i=>i.id===editId);
   const isFromOtherMarket = currentCountry && img.uploadedBy !== currentCountry;
   const typedTitle=document.getElementById('editTitle').value.trim();
-  // Flush any free-text color inputs not yet stored via onblur
+  // Flush free-text color inputs
   document.querySelectorAll('#editProdAcc input.free-color-input').forEach(input=>{
     const prod=input.getAttribute('data-prod');
     if(prod&&input.value.trim()) eProdColors.set(prod, input.value.trim());
@@ -1177,8 +1177,12 @@ async function saveEdit(){
   const eProdColorPairs=[...eProds].map(p=>({prod:p,color:eProdColors.get(p)||null}));
   const eColors=[...new Set(eProdColorPairs.map(({color})=>color).filter(Boolean))];
   const autoTitle=['Moelven',...eProdColorPairs.map(({prod,color})=>prod+(color?' '+color:''))].join(' ');
-  const userChangedTitle = typedTitle && typedTitle !== (isFromOtherMarket?img.localMeta?.[currentCountry]?.title:img.title);
-  const newTitle=userChangedTitle?typedTitle:autoTitle;
+
+  // Use typed title only if user actually changed it from the auto-generated one
+  const prevTitle = isFromOtherMarket ? (img.localMeta?.[currentCountry]?.title||'') : img.title;
+  const userChangedTitle = typedTitle && typedTitle !== prevTitle && typedTitle !== autoTitle;
+  const newTitle = userChangedTitle ? typedTitle : autoTitle;
+
   const localData={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile};
 
   let metaToSave;
@@ -1186,17 +1190,22 @@ async function saveEdit(){
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
 
   if(isFromOtherMarket){
-    // Store as local market metadata, don't touch original
+    // Store as local market metadata – only localMeta and localTags change
     if(!img.localMeta) img.localMeta={};
     img.localMeta[currentCountry]=localData;
     if(!img.localTags) img.localTags={};
     img.localTags[currentCountry]=true;
-    metaToSave={...img, localMeta:img.localMeta, localTags:img.localTags};
-    newFileName=img.name; // keep original filename
+    // metaToSave: keep ALL original img properties, just update localMeta and localTags
+    metaToSave={
+      title:img.title, categories:img.categories, products:img.products,
+      colors:img.colors, prodColorPairs:img.prodColorPairs, extras:img.extras,
+      credit:img.credit, profile:img.profile, markets:img.markets,
+      uploadedBy:img.uploadedBy, localTags:img.localTags, localMeta:img.localMeta
+    };
+    newFileName=img.name;
   } else {
-    // Own market – update normally
     newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
-    metaToSave={...img,...localData,markets:getSelectedMarkets('editMarketChips'),name:newFileName};
+    metaToSave={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:localData.credit,profile:eProfile,markets:getSelectedMarkets('editMarketChips'),uploadedBy:img.uploadedBy,localTags:img.localTags,localMeta:img.localMeta};
     img.title=newTitle; img.name=newFileName;
     img.categories=[...eCats]; img.products=[...eProds];
     img.colors=eColors; img.prodColorPairs=eProdColorPairs;
@@ -1214,7 +1223,7 @@ async function saveEdit(){
     renderAll();
     showToast(S.savedOk);
   } catch(e){ showToast(S.saveError); }
-  saveBtn.disabled=false; cancelBtn.disabled=false; saveBtn.textContent='Lagre endringer';
+  saveBtn.disabled=false; cancelBtn.disabled=false; saveBtn.textContent=S.saveChanges;
 }
 document.getElementById('editModal').addEventListener('click',e=>{if(e.target===document.getElementById('editModal'))closeEditModal();});
 
