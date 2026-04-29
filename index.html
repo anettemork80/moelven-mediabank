@@ -485,6 +485,8 @@
 <script>
 const CLIENT_ID = '97591089619-ov8t3bcs7kh98pnuq8sk1pmvanh90f09.apps.googleusercontent.com';
 const FOLDER_ID = '1zbcjB56XcCgeJKgwsW0KECME-tKkMgjy';
+let inboxImages = []; // separate array for inbox items
+let inboxFolderCache = {}; // cache inbox folder IDs per country
 const SCOPES = 'https://www.googleapis.com/auth/drive';
 
 const OPTI_FORMATS = [
@@ -777,9 +779,16 @@ async function getUserInfo() {
   } catch(e) {}
 }
 
+function parseImageFile(f){
+  let meta={};
+  try{meta=JSON.parse(f.description||'{}');}catch(e){}
+  return {id:f.id,name:f.name,title:meta.title||f.name.replace(/\.[^.]+$/,''),categories:meta.categories||[],products:meta.products||[],colors:meta.colors||[],prodColorPairs:meta.prodColorPairs||[],extras:meta.extras||[],credit:meta.credit||'',profile:meta.profile||null,markets:meta.markets||[currentCountry||'no'],uploadedBy:meta.uploadedBy||currentCountry||'no',sourceId:meta.sourceId||null,thumbnailLink:f.thumbnailLink,fileSize:f.size?parseInt(f.size):null};
+}
+
 async function loadImages() {
   document.getElementById('grid').innerHTML = '<div class="loading-grid"><div class="spinner"></div>Laster bilder fra Drive…</div>';
   try {
+    // Only load images directly in the main folder (own market)
     const q = encodeURIComponent(`'${FOLDER_ID}' in parents and mimeType contains 'image/' and trashed=false`);
     const fields = encodeURIComponent('files(id,name,description,thumbnailLink,createdTime,size)');
     const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=createdTime desc`, {
@@ -787,20 +796,55 @@ async function loadImages() {
     });
     const data = await resp.json();
     if(!resp.ok){
-      console.error('Drive API error:', resp.status, data);
       document.getElementById('grid').innerHTML = `<div class="empty"><p>Drive API feil ${resp.status}: ${data.error?.message||'Ukjent feil'}</p></div>`;
       return;
     }
-    images = (data.files || []).map(f => {
-      let meta = {};
-      try { meta = JSON.parse(f.description || '{}'); } catch(e) {}
-      return { id:f.id, name:f.name, title:meta.title||f.name.replace(/\.[^.]+$/,''), categories:meta.categories||[], products:meta.products||[], colors:meta.colors||[], prodColorPairs:meta.prodColorPairs||[], extras:meta.extras||[], credit:meta.credit||'', profile:meta.profile||null, markets:meta.markets||['no'], uploadedBy:meta.uploadedBy||'no', localTags:meta.localTags||null, localMeta:meta.localMeta||{}, thumbnailLink:f.thumbnailLink, fileSize:f.size?parseInt(f.size):null };
-    });
+    images = (data.files||[]).map(parseImageFile);
+    await loadInbox();
     renderAll();
   } catch(e) {
-    console.error('loadImages exception:', e);
     document.getElementById('grid').innerHTML = `<div class="empty"><p>Kunne ikke laste bilder: ${e.message}</p></div>`;
   }
+}
+
+async function getOrCreateInboxFolder(country){
+  if(inboxFolderCache[country]) return inboxFolderCache[country];
+  // Find or create Inbox parent folder
+  let inboxParentId;
+  const q1=encodeURIComponent(`'${FOLDER_ID}' in parents and name='Inbox' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const r1=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q1}&fields=files(id)`,{headers:{Authorization:'Bearer '+accessToken}});
+  const d1=await r1.json();
+  if(d1.files&&d1.files.length){
+    inboxParentId=d1.files[0].id;
+  } else {
+    const cr=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({name:'Inbox',mimeType:'application/vnd.google-apps.folder',parents:[FOLDER_ID]})});
+    inboxParentId=(await cr.json()).id;
+  }
+  // Find or create country subfolder
+  const q2=encodeURIComponent(`'${inboxParentId}' in parents and name='${country}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const r2=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q2}&fields=files(id)`,{headers:{Authorization:'Bearer '+accessToken}});
+  const d2=await r2.json();
+  let folderId;
+  if(d2.files&&d2.files.length){
+    folderId=d2.files[0].id;
+  } else {
+    const cr2=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({name:country,mimeType:'application/vnd.google-apps.folder',parents:[inboxParentId]})});
+    folderId=(await cr2.json()).id;
+  }
+  inboxFolderCache[country]=folderId;
+  return folderId;
+}
+
+async function loadInbox(){
+  if(!currentCountry){inboxImages=[];return;}
+  try{
+    const folderId=await getOrCreateInboxFolder(currentCountry);
+    const q=encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed=false`);
+    const fields=encodeURIComponent('files(id,name,description,thumbnailLink,createdTime,size)');
+    const resp=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=createdTime desc`,{headers:{Authorization:'Bearer '+accessToken}});
+    const data=await resp.json();
+    inboxImages=(data.files||[]).map(parseImageFile);
+  }catch(e){inboxImages=[];}
 }
 
 async function uploadToDrive(file, meta, fileName) {
@@ -812,40 +856,16 @@ async function uploadToDrive(file, meta, fileName) {
   }).then(r => r.json());
 }
 
-function getImgMeta(img){
-  // Use localMeta for current country whenever it exists
-  if(currentCountry && img.localMeta?.[currentCountry]){
-    const local=img.localMeta[currentCountry];
-    return {
-      title: local.title||img.title,
-      categories: local.categories!==undefined ? local.categories : img.categories,
-      products: local.products!==undefined ? local.products : img.products,
-      colors: local.colors!==undefined ? local.colors : img.colors,
-      extras: local.extras!==undefined ? local.extras : img.extras,
-      credit: local.credit!==undefined ? local.credit : img.credit,
-      profile: local.profile!==undefined ? local.profile : img.profile
-    };
-  }
-  return img;
-}
-
 function renderSidebar() {
-  // Inbox: images tagged for current country but not yet locally tagged (approved)
-  const inboxImages = currentCountry ? images.filter(i=>
-    i.markets && i.markets.includes(currentCountry) &&
-    i.uploadedBy !== currentCountry &&
-    !i.localTags?.[currentCountry]
-  ) : [];
-
   let h='';
   if(inboxImages.length){
     h+=`<div class="inbox-item" onclick="openInbox()"><span>${S.inboxTitle}</span><span class="inbox-badge">${inboxImages.length}</span></div>`;
   }
-  h+=`<div class="cat-item ${!activeCat?'active':''}" onclick="nav(null)"><span class="cat-name">${S.allImages}</span><span class="cat-count">${images.filter(i=>!currentCountry||(i.markets&&i.markets.includes(currentCountry)&&(i.uploadedBy===currentCountry||i.localTags?.[currentCountry]===true))).length}</span></div><div class="sidebar-label">${S.categories}</div>`;
+  h+=`<div class="cat-item ${!activeCat?'active':''}" onclick="nav(null)"><span class="cat-name">${S.allImages}</span><span class="cat-count">${images.length}</span></div><div class="sidebar-label">${S.categories}</div>`;
   for(const[cat,d]of Object.entries(TAXONOMY)){
-    const cnt=images.filter(i=>i.categories.includes(cat)&&(!currentCountry||(i.markets&&i.markets.includes(currentCountry)&&(i.uploadedBy===currentCountry||i.localTags?.[currentCountry]===true)))).length,on=activeCat===cat;
+    const cnt=images.filter(i=>i.categories.includes(cat)).length,on=activeCat===cat;
     h+=`<div><div class="cat-item ${on?'active':''}" onclick="nav('${cat}')"><span class="cat-name">${cat}</span><span class="cat-count">${cnt}</span></div><div class="subcat-list ${on?'open':''}">`;
-    for(const p of Object.keys(d.products)){const pc=images.filter(i=>i.products.includes(p)&&(!currentCountry||(i.markets&&i.markets.includes(currentCountry)&&(i.uploadedBy===currentCountry||i.localTags?.[currentCountry]===true)))).length;h+=`<div class="subcat-item ${activeProd===p?'active':''}" onclick="navProd('${p}')"><span>${p}</span>${pc?`<span style="font-size:10px;opacity:0.45">${pc}</span>`:''}</div>`;}
+    for(const p of Object.keys(d.products)){const pc=images.filter(i=>i.products.includes(p)).length;h+=`<div class="subcat-item ${activeProd===p?'active':''}" onclick="navProd('${p}')"><span>${p}</span>${pc?`<span style="font-size:10px;opacity:0.45">${pc}</span>`:''}</div>`;}
     h+=`</div></div>`;
   }
   document.getElementById('sidebar').innerHTML=h;
@@ -853,22 +873,12 @@ function renderSidebar() {
 
 function renderGrid() {
   let f=[...images];
-  // Filter by current country/market
-  // Cross-market images only show after being approved (localTags set and not rejected)
-  if(currentCountry) f=f.filter(i=>{
-    if(!i.markets||i.markets.length===0||!i.markets.includes(currentCountry)) return false;
-    if(i.uploadedBy!==currentCountry){
-      // From another market – only show if approved (localTags = true, not 'rejected')
-      return i.localTags?.[currentCountry]===true;
-    }
-    return true;
-  });
   if(activeCat)f=f.filter(i=>i.categories.includes(activeCat));
   if(activeProd)f=f.filter(i=>i.products.includes(activeProd));
   if(searchQ){const q=searchQ.toLowerCase();f=f.filter(i=>[i.title,...i.categories,...i.products,...i.colors,...i.extras].some(x=>x&&x.toLowerCase().includes(q)));}
   document.getElementById('breadcrumb').innerHTML=activeProd?`${activeCat} → <strong>${activeProd}</strong>`:activeCat?`<strong>${activeCat}</strong>`:'<strong>Alle bilder</strong>';
   document.getElementById('resultCount').textContent=`${f.length} bilde${f.length!==1?'r':''}`;
-  const visibleCount=currentCountry?images.filter(i=>i.markets&&i.markets.includes(currentCountry)&&(i.uploadedBy===currentCountry||i.localTags?.[currentCountry]===true)).length:images.length;
+  const visibleCount=images.length;
   document.getElementById('statsText').textContent=`${visibleCount} bilder`;
   const g=document.getElementById('grid');
   if(!f.length){
@@ -894,29 +904,28 @@ function renderGrid() {
     g.innerHTML=emptyMsg; return;
   }
   g.innerHTML=f.map(img=>{
-    const m=getImgMeta(img); // use market-specific metadata if available
     const thumb=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s400'):'';
     const full=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s1600'):'';
     const sizeStr=img.fileSize?formatSize(img.fileSize):'';
     return`<div class="card ${selected.has(img.id)?'selected':''}" onclick="toggleSel('${img.id}')">
-      <div class="card-img" onclick="event.stopPropagation();${thumb?`openLightbox('${full||thumb}','${m.title.replace(/'/g,"\\'")}')`:''}" style="${thumb?'cursor:zoom-in':''}">
+      <div class="card-img" onclick="event.stopPropagation();${thumb?`openLightbox('${full||thumb}','${img.title.replace(/'/g,"\\'")}')`:''}" style="${thumb?'cursor:zoom-in':''}">
         ${thumb?`<img src="${thumb}" alt="" loading="lazy">`:`<div class="card-placeholder"><svg style="width:28px;height:28px;opacity:0.22" viewBox="0 0 32 32" fill="none"><rect x="2" y="6" width="28" height="20" rx="2" stroke="#473b33" stroke-width="2"/><circle cx="11" cy="13" r="2.5" stroke="#473b33" stroke-width="2"/><path d="M2 22l7-5 5 4 5-6 11 7" stroke="#473b33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Bilde</span></div>`}
-        ${m.categories.length>1?`<div class="multi-badge">${m.categories.length} kat.</div>`:''}
+        ${img.categories.length>1?`<div class="multi-badge">${img.categories.length} kat.</div>`:''}
         <div class="card-check">✓</div>
         ${thumb?`<div class="zoom-icon"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3.5" stroke="#473b33" stroke-width="1.2"/><path d="M8 8l2.5 2.5" stroke="#473b33" stroke-width="1.2" stroke-linecap="round"/></svg></div>`:''}
         <button class="edit-btn" onclick="event.stopPropagation();openEditModal('${img.id}')">${S.editBtn}</button>
         <button class="delete-btn" onclick="event.stopPropagation();deleteImage('${img.id}')">${S.deleteBtn}</button>
         <button class="opti-btn" onclick="event.stopPropagation();openOptiModal('${img.id}')">${S.optiBtn}</button>      </div>
       <div class="card-body">
-        <div class="card-name">${m.title}</div>
+        <div class="card-name">${img.title}</div>
         <div class="card-tags">
-          ${m.categories.map(c=>`<span class="tag tag-cat">${c}</span>`).join('')}
-          ${m.colors.slice(0,2).map(c=>`<span class="tag tag-color">${c}</span>`).join('')}
-          ${m.extras.slice(0,2).map(e=>`<span class="tag tag-extra">${e}</span>`).join('')}
-          ${m.profile?`<span class="tag" style="background:rgba(12,76,81,0.07);color:var(--teal-light);">${m.profile}</span>`:''}
+          ${img.categories.map(c=>`<span class="tag tag-cat">${c}</span>`).join('')}
+          ${img.colors.slice(0,2).map(c=>`<span class="tag tag-color">${c}</span>`).join('')}
+          ${img.extras.slice(0,2).map(e=>`<span class="tag tag-extra">${e}</span>`).join('')}
+          ${img.profile?`<span class="tag" style="background:rgba(12,76,81,0.07);color:var(--teal-light);">${img.profile}</span>`:''}
           ${sizeStr?`<span class="tag tag-size">${sizeStr}</span>`:''}
         </div>
-        ${m.credit?`<div class="card-credit">© ${m.credit}</div>`:''}
+        ${img.credit?`<div class="card-credit">© ${img.credit}</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -1057,6 +1066,17 @@ async function saveImage(){
     try{
       const res=await uploadToDrive(file,fm,autoFileName);
       images.unshift({id:res.id,name:autoFileName,...fm,title:usedTitle,thumbnailLink:res.thumbnailLink});
+      // Create inbox copies for other markets
+      const otherMarkets=(markets||[]).filter(m=>m!==currentCountry);
+      for(const otherMarket of otherMarkets){
+        document.getElementById('progressStatus').textContent=`Sender til ${otherMarket.toUpperCase()}-innboks…`;
+        const inboxFolderId=await getOrCreateInboxFolder(otherMarket);
+        const inboxMeta={...fm,title:usedTitle,sourceId:res.id,uploadedBy:currentCountry};
+        const inboxForm=new FormData();
+        inboxForm.append('metadata',new Blob([JSON.stringify({name:autoFileName,parents:[inboxFolderId],description:JSON.stringify(inboxMeta)})],{type:'application/json'}));
+        inboxForm.append('file',file);
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:'Bearer '+accessToken},body:inboxForm});
+      }
     }
     catch(e){showToast('Feil: '+file.name);}
     done++;document.getElementById('progressFill').style.width=Math.round(done/pendingFiles.length*100)+'%';
@@ -1102,25 +1122,22 @@ let editId=null, eCats=new Set(), eProds=new Set(), eProdColors=new Map(), eExtr
 const EXTRA_TAGS=['Interiør','Eksteriør','Miljøbilde','Produktbilde','Detalj','Hus','Hytte','Leilighet','Nybygg','Rehabilitering','Montasje','Prosjektbilde'];
 
 function openEditModal(id){
-  const img=images.find(i=>i.id===id); if(!img) return;
+  const img=images.find(i=>i.id===id)||inboxImages.find(i=>i.id===id);
+  if(!img) return;
   editId=id;
-  // Use local market metadata if this image is from another market
-  const isFromOtherMarket = currentCountry && img.uploadedBy !== currentCountry;
-  const local = isFromOtherMarket && img.localMeta?.[currentCountry];
-  const src = local ? {...img, ...local} : img;
-  eCats=new Set(src.categories||[]);
-  eProds=new Set(src.products||[]);
+  eCats=new Set(img.categories||[]);
+  eProds=new Set(img.products||[]);
   eProdColors=new Map();
-  if(src.prodColorPairs){src.prodColorPairs.forEach(({prod,color})=>{if(color)eProdColors.set(prod,color);});}
-  else if(src.colors&&src.colors.length){[...eProds].forEach(p=>{const cats=[...eCats];for(const cat of cats){const cs=TAXONOMY[cat]?.products[p];if(cs&&cs.length){const match=src.colors.find(c=>cs.includes(c));if(match)eProdColors.set(p,match);}}})}
-  eExtras=new Set((src.extras||[]).map(e=>e.trim()));
-  document.getElementById('editTitle').value=src.title||'';
-  document.getElementById('editCredit').value=src.credit||'';
-  eProfile=src.profile||null;
+  if(img.prodColorPairs){img.prodColorPairs.forEach(({prod,color})=>{if(color)eProdColors.set(prod,color);});}
+  else if(img.colors&&img.colors.length){[...eProds].forEach(p=>{const cats=[...eCats];for(const cat of cats){const cs=TAXONOMY[cat]?.products[p];if(cs&&cs.length){const match=img.colors.find(c=>cs.includes(c));if(match)eProdColors.set(p,match);}}})}
+  eExtras=new Set((img.extras||[]).map(e=>e.trim()));
+  document.getElementById('editTitle').value=img.title||'';
+  document.getElementById('editCredit').value=img.credit||'';
+  eProfile=img.profile||null;
   // Pre-select markets
   document.querySelectorAll('#editMarketChips .market-chip').forEach(chip=>{
     const m=chip.getAttribute('data-market');
-    chip.classList.toggle('selected', img.markets?img.markets.includes(m):m==='no');
+    chip.classList.toggle('selected', img.markets?img.markets.includes(m):m===currentCountry);
   });
   if(img.thumbnailLink){
     document.getElementById('editThumb').src=img.thumbnailLink.replace('=s220','=s800');
@@ -1167,8 +1184,8 @@ async function saveEdit(){
   if(!editId) return;
   const saveBtn=document.getElementById('editSaveBtn'),cancelBtn=document.getElementById('editCancelBtn');
   saveBtn.disabled=true; cancelBtn.disabled=true; saveBtn.textContent=S.saving;
-  const img=images.find(i=>i.id===editId);
-  const isFromOtherMarket = currentCountry && img.uploadedBy !== currentCountry;
+  const img=images.find(i=>i.id===editId)||inboxImages.find(i=>i.id===editId);
+  if(!img){saveBtn.disabled=false;cancelBtn.disabled=false;saveBtn.textContent=S.saveChanges;return;}
   const typedTitle=document.getElementById('editTitle').value.trim();
   // Flush free-text color inputs
   document.querySelectorAll('#editProdAcc input.free-color-input').forEach(input=>{
@@ -1178,39 +1195,42 @@ async function saveEdit(){
   const eProdColorPairs=[...eProds].map(p=>({prod:p,color:eProdColors.get(p)||null}));
   const eColors=[...new Set(eProdColorPairs.map(({color})=>color).filter(Boolean))];
   const autoTitle=['Moelven',...eProdColorPairs.map(({prod,color})=>prod+(color?' '+color:''))].join(' ');
-
-  // Use typed title only if user actually changed it from the auto-generated one
-  const prevTitle = isFromOtherMarket ? (img.localMeta?.[currentCountry]?.title||'') : img.title;
-  const userChangedTitle = typedTitle && typedTitle !== prevTitle && typedTitle !== autoTitle;
-  const newTitle = userChangedTitle ? typedTitle : autoTitle;
-
-  const localData={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile};
-
-  let metaToSave;
-  let newFileName;
+  const userChangedTitle=typedTitle && typedTitle!==img.title && typedTitle!==autoTitle;
+  const newTitle=userChangedTitle?typedTitle:autoTitle;
   const ext=img.name.match(/\.[^.]+$/)?.[0]||'';
-
-  if(isFromOtherMarket){
-    if(!img.localMeta) img.localMeta={};
-    img.localMeta[currentCountry]=localData;
-    if(!img.localTags) img.localTags={};
-    img.localTags[currentCountry]=true;    metaToSave=buildCleanMeta(img);    newFileName=img.name;
-  } else {
-    newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
-    img.title=newTitle; img.name=newFileName;
-    img.categories=[...eCats]; img.products=[...eProds];
-    img.colors=eColors; img.prodColorPairs=eProdColorPairs;
-    img.extras=[...eExtras]; img.credit=localData.credit; img.profile=eProfile;
-    img.markets=getSelectedMarkets('editMarketChips');
-    metaToSave=buildCleanMeta(img);
-  }
-
-  try{    const patchResp=await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
-      method:'PATCH',
-      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
-    });
-    const patchData=await patchResp.json();    if(!patchResp.ok)    closeEditModal();
+  const newFileName=['Moelven',...eProdColorPairs.map(({prod,color})=>prod.replace(/\s+/g,'')+(color?'-'+color.replace(/\s+/g,''):''))].join('-')+ext;
+  const newMarkets=getSelectedMarkets('editMarketChips');
+  const metaToSave={title:newTitle,categories:[...eCats],products:[...eProds],colors:eColors,prodColorPairs:eProdColorPairs,extras:[...eExtras],credit:document.getElementById('editCredit').value.trim(),profile:eProfile,markets:newMarkets,uploadedBy:img.uploadedBy||currentCountry,sourceId:img.sourceId||null};
+  try{
+    const isInboxImage = inboxImages.some(i=>i.id===editId);
+    if(isInboxImage){
+      // Move from inbox to main folder with new name and Swedish tags
+      const inboxFolderId=await getOrCreateInboxFolder(currentCountry);
+      await fetch(`https://www.googleapis.com/drive/v3/files/${editId}?addParents=${FOLDER_ID}&removeParents=${inboxFolderId}`,{
+        method:'PATCH',
+        headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
+      });
+      img.name=newFileName; img.title=newTitle;
+      img.categories=[...eCats]; img.products=[...eProds];
+      img.colors=eColors; img.prodColorPairs=eProdColorPairs;
+      img.extras=[...eExtras]; img.credit=metaToSave.credit; img.profile=eProfile;
+      img.markets=newMarkets;
+      images.unshift(img);
+      inboxImages=inboxImages.filter(i=>i.id!==editId);
+    } else {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${editId}`,{
+        method:'PATCH',
+        headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({name:newFileName,description:JSON.stringify(metaToSave)})
+      });
+      img.title=newTitle; img.name=newFileName;
+      img.categories=[...eCats]; img.products=[...eProds];
+      img.colors=eColors; img.prodColorPairs=eProdColorPairs;
+      img.extras=[...eExtras]; img.credit=metaToSave.credit; img.profile=eProfile;
+      img.markets=newMarkets;
+    }
+    closeEditModal();
     renderAll();
     showToast(S.savedOk);
   } catch(e){ showToast(S.saveError); }
@@ -1220,20 +1240,15 @@ document.getElementById('editModal').addEventListener('click',e=>{if(e.target===
 
 function openInbox(){
   const countryNames={no:'Norge',se:'Sverige',dk:'Danmark'};
-  const inboxImages=images.filter(i=>
-    i.markets&&i.markets.includes(currentCountry)&&
-    i.uploadedBy!==currentCountry&&
-    !(i.localTags?.[currentCountry])
-  );
-  const grid=document.getElementById('inboxGrid');
   document.getElementById('inboxModalTitle').textContent=S.inboxTitle;
   document.getElementById('inboxModalSub').textContent=S.inboxSub;
+  const grid=document.getElementById('inboxGrid');
   if(!inboxImages.length){
     grid.innerHTML=`<p style="color:var(--text-light);text-align:center;padding:20px">${S.inboxEmpty}</p>`;
   } else {
     grid.innerHTML=inboxImages.map(img=>{
       const thumb=img.thumbnailLink?img.thumbnailLink.replace('=s220','=s400'):'';
-      const from=img.markets.filter(m=>m!==currentCountry).map(m=>countryNames[m]||m).join(', ');
+      const from=countryNames[img.uploadedBy]||img.uploadedBy||'?';
       return`<div class="inbox-card">
         ${thumb?`<img class="inbox-thumb" src="${thumb}" alt="">`:`<div class="inbox-thumb"></div>`}
         <div class="inbox-info">
@@ -1242,8 +1257,7 @@ function openInbox(){
           <div class="inbox-meta">${img.categories.join(', ')}${img.colors.length?' · '+img.colors.join(', '):''}</div>
           <div class="inbox-actions">
             <button class="inbox-reject-btn" onclick="rejectFromInbox('${img.id}')">${S.inboxReject}</button>
-            <button class="inbox-edit-btn" onclick="approveFromInbox('${img.id}',true)">${S.inboxEdit}</button>
-            <button class="inbox-approve-btn" onclick="approveFromInbox('${img.id}',false)">${S.inboxApprove}</button>
+            <button class="inbox-approve-btn" onclick="approveFromInbox('${img.id}')">${S.inboxEdit}</button>
           </div>
         </div>
       </div>`;
@@ -1252,41 +1266,22 @@ function openInbox(){
   document.getElementById('inboxModal').classList.add('open');
 }
 
-function buildCleanMeta(img){
-  // Only save what's needed – avoid Drive description size limit
-  return {
-    title: img.title,
-    categories: img.categories||[],
-    products: img.products||[],
-    colors: img.colors||[],
-    prodColorPairs: img.prodColorPairs||[],
-    extras: img.extras||[],
-    credit: img.credit||'',
-    profile: img.profile||null,
-    markets: img.markets||['no'],
-    uploadedBy: img.uploadedBy||'no',
-    localTags: img.localTags||null,
-    localMeta: img.localMeta||{}
-  };
+async function approveFromInbox(id){
+  const img=inboxImages.find(i=>i.id===id);
+  if(!img) return;
+  document.getElementById('inboxModal').classList.remove('open');
+  setTimeout(()=>openEditModal(id),150);
 }
 
-async function approveFromInbox(id, openEdit){
-  const img=images.find(i=>i.id===id);
-  if(!img) return;
-  if(!img.localTags) img.localTags={};
-  img.localTags[currentCountry]=true;
-  const meta=buildCleanMeta(img);
+async function rejectFromInbox(id){
+  if(!confirm(S.inboxRejectConfirm)) return;
   try{
-    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
-      method:'PATCH',
-      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({description:JSON.stringify(meta)})
-    });
+    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+accessToken}});
+    inboxImages=inboxImages.filter(i=>i.id!==id);
     document.getElementById('inboxModal').classList.remove('open');
     renderAll();
-    showToast(openEdit?'Åpner for redigering…':S.savedOk);
-    if(openEdit) setTimeout(()=>openEditModal(id),300);
-  } catch(e){ showToast(S.approveError); }
+    showToast(S.rejectDone);
+  } catch(e){ showToast(S.rejectError); }
 }
 
 document.getElementById('inboxModal').addEventListener('click',e=>{if(e.target===document.getElementById('inboxModal'))document.getElementById('inboxModal').classList.remove('open');});
@@ -1356,36 +1351,14 @@ async function downloadAllOptiVersions(){
 async function deleteImage(id){
   const img=images.find(i=>i.id===id);
   if(!img) return;
-  if(!confirm(`${S.deleteConfirm.replace('dette bildet',img.title)}`))
-  if(!confirm(`${S.deleteConfirm}`)) return;
+  if(!confirm(S.deleteConfirm)) return;
   try{
-    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
-      method:'DELETE',
-      headers:{Authorization:'Bearer '+accessToken}
-    });
+    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+accessToken}});
     images=images.filter(i=>i.id!==id);
     selected.delete(id);
     renderAll();
     showToast(S.deleted);
   } catch(e){ showToast(S.deleteError); }
-}
-
-async function rejectFromInbox(id){
-  const img=images.find(i=>i.id===id);
-  if(!img) return;
-  if(!confirm(S.inboxRejectConfirm)) return;
-  if(!img.localTags) img.localTags={};
-  img.localTags[currentCountry]='rejected';
-  try{
-    await fetch(`https://www.googleapis.com/drive/v3/files/${id}`,{
-      method:'PATCH',
-      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({description:JSON.stringify(buildCleanMeta(img))})
-    });
-    document.getElementById('inboxModal').classList.remove('open');
-    renderAll();
-    showToast(S.rejectDone);
-  } catch(e){ showToast(S.rejectError); }
 }
 
 function formatSize(bytes){if(!bytes)return'';if(bytes<1024*1024)return Math.round(bytes/1024)+'KB';return(bytes/(1024*1024)).toFixed(1)+'MB';}
