@@ -843,7 +843,8 @@ async function loadInbox(){
     const fields=encodeURIComponent('files(id,name,description,thumbnailLink,createdTime,size)');
     const resp=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=createdTime desc`,{headers:{Authorization:'Bearer '+accessToken}});
     const data=await resp.json();
-    inboxImages=(data.files||[]).map(parseImageFile);
+    // Only show images uploaded by other countries (not own market)
+    inboxImages=(data.files||[]).map(parseImageFile).filter(img=>img.uploadedBy&&img.uploadedBy!==currentCountry);
   }catch(e){inboxImages=[];}
 }
 
@@ -1066,8 +1067,8 @@ async function saveImage(){
     try{
       const res=await uploadToDrive(file,fm,autoFileName);
       images.unshift({id:res.id,name:autoFileName,...fm,title:usedTitle,thumbnailLink:res.thumbnailLink});
-      // Create inbox copies for other markets
-      const otherMarkets=(markets||[]).filter(m=>m!==currentCountry);
+      // Create inbox copies for other markets (markets selected in the form, excluding uploader's own country)
+      const otherMarkets=(markets||[]).filter(m=>m&&m!==currentCountry);
       for(const otherMarket of otherMarkets){
         document.getElementById('progressStatus').textContent=`Sender til ${otherMarket.toUpperCase()}-innboks…`;
         const inboxFolderId=await getOrCreateInboxFolder(otherMarket);
